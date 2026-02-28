@@ -1,11 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CHECKINS, MOOD_MAP } from "@/lib/mock-data";
 import { SegmentedControl, Sparkline } from "./shared";
+import { useUser } from "@/lib/user-context";
+
+// HealthPattern mirrors the backend's patternDetection.ts HealthPattern type.
+// These are embedding-derived clusters: groups of check-ins whose 1024-dim vectors
+// are similar enough (cosine >= 0.82) to indicate a recurring health pattern.
+// The backend generates a Mistral-written human-readable description for each.
+interface HealthPattern {
+  pattern_type: "recurring_symptom" | "symptom_cluster" | "trend_change";
+  description: string;
+  confidence: number;   // 0-1, based on cluster size + symptom overlap
+  occurrences: number;  // number of check-ins in this cluster
+  first_seen: string;
+  last_seen: string;
+}
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 export function Trends() {
+  const { user } = useUser();
   const [range, setRange] = useState("week");
+  const [patterns, setPatterns] = useState<HealthPattern[]>([]);
+  const [patternsLoading, setPatternsLoading] = useState(false);
+
   const data = CHECKINS.slice(0, 7).reverse();
   const labels = data.map((c) => c.date.split(" ")[1]);
   const energyD = data.map((c) => c.energy);
@@ -35,6 +55,36 @@ export function Trends() {
 
   const avgEnergy = (energyD.reduce((a, b) => a + b, 0) / energyD.length).toFixed(1);
   const avgSleep = (sleepD.reduce((a, b) => a + b, 0) / sleepD.length).toFixed(1);
+
+  // Fetch RAG-powered pattern detection results from the backend.
+  // This calls GET /api/patterns which runs the full embedding clustering pipeline:
+  // 1. Fetches last 30 days of check-in embeddings
+  // 2. Queries pgvector for nearest neighbors per check-in
+  // 3. Clusters via connected-components algorithm (similarity >= 0.82)
+  // 4. Asks Mistral to describe each cluster in plain English
+  // Results are cached server-side for 1 hour.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchPatterns = async () => {
+      setPatternsLoading(true);
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/patterns`, {
+          headers: { "x-user-id": user.id },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPatterns(data.patterns || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch patterns:", err);
+      } finally {
+        setPatternsLoading(false);
+      }
+    };
+
+    fetchPatterns();
+  }, [user?.id]);
 
   return (
     <div className="px-5 pt-8 pb-[100px]">
@@ -173,16 +223,46 @@ export function Trends() {
         ))}
       </div>
 
-      {/* AI Insight */}
-      <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
-        <div className="mb-2 flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-          <span className="text-xs font-semibold text-sky-700">AI Insight</span>
+      {/* AI Insights — from pattern detection API */}
+      {patternsLoading ? (
+        <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+            <span className="text-xs font-semibold text-sky-700">AI Insights</span>
+          </div>
+          <p className="text-[13px] leading-relaxed text-slate-400">Analyzing your health patterns...</p>
         </div>
-        <p className="text-[13px] leading-relaxed text-slate-600">
-          Your energy dips correlate with nights under 6 hours sleep. Feb 27 shows the lowest energy (5/10) following 5 hours sleep, combined with missed Vitamin D and new symptoms (thirst, fatigue) that may relate to your elevated HbA1c.
-        </p>
-      </div>
+      ) : patterns.length > 0 ? (
+        <div className="space-y-3">
+          {patterns.map((pattern, i) => (
+            <div key={i} className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                <span className="text-xs font-semibold text-sky-700">
+                  {pattern.pattern_type === "symptom_cluster" ? "Symptom Cluster" :
+                   pattern.pattern_type === "recurring_symptom" ? "Recurring Pattern" :
+                   "Trend Change"}
+                </span>
+                <span className="ml-auto text-[10px] text-sky-500">{pattern.occurrences}x occurrences</span>
+              </div>
+              <p className="text-[13px] leading-relaxed text-slate-600">{pattern.description}</p>
+              <p className="mt-2 text-[10px] text-slate-400">
+                Confidence: {(pattern.confidence * 100).toFixed(0)}% | {new Date(pattern.first_seen).toLocaleDateString()} - {new Date(pattern.last_seen).toLocaleDateString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+            <span className="text-xs font-semibold text-sky-700">AI Insight</span>
+          </div>
+          <p className="text-[13px] leading-relaxed text-slate-600">
+            Keep logging your check-ins to unlock AI-powered health pattern detection. We need at least a few days of data to identify meaningful trends.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

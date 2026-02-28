@@ -3,6 +3,10 @@ import multer from "multer";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
+// documentPipeline handles the RAG ingestion: splits document text into chunks,
+// embeds each chunk independently, and stores them in document_chunks table
+// for fine-grained vector similarity search via match_document_chunks() RPC
+import { processDocument } from "../services/documentPipeline";
 
 const router = Router();
 router.use(requireAuth);
@@ -81,6 +85,11 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     fileUrl = publicUrl;
   }
 
+  // Two AI operations in parallel:
+  //   1. summarizeDocument: Mistral generates a 3-5 sentence human-readable summary
+  //   2. embedText: Mistral generates a 1024-dim vector for coarse document-level search
+  // The embedding enables the document to be found by findRelatedContext(),
+  // while the chunking pipeline (below) enables more precise section-level matching.
   const [summary, embedding] = await Promise.all([
     summarizeDocument(document_text),
     embedText(document_text),
@@ -104,6 +113,15 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     res.status(500).json({ error: dbError.message });
     return;
   }
+
+  // Fire-and-forget: run the RAG chunking pipeline in background.
+  // This splits the document into ~500-token chunks (via chunking.ts),
+  // embeds each chunk independently (via documentPipeline.ts),
+  // and stores them in document_chunks for granular vector search.
+  // The response returns immediately — chunking happens asynchronously.
+  processDocument(doc.id, document_text, docType).catch((err) => {
+    console.error(`[documents] Chunking pipeline failed for ${doc.id}:`, err.message);
+  });
 
   res.status(201).json(doc);
 });

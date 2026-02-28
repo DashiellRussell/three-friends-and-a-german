@@ -131,6 +131,30 @@ export const generateReport = async (data: any) => {
             summaryText = `(MOCK AI) ${summaryText} The patient also experienced recurring negative symptoms, including low energy and reported headaches over the tracked period. Please monitor these closely.`;
         } else {
             try {
+                // ── RAG-enriched executive summary ──
+                // Two sources of vector intelligence feed into the report:
+                //
+                // 1. patterns: Clusters of similar check-in embeddings detected by
+                //    patternDetection.ts (e.g., "recurring headache + fatigue over 12 days")
+                //
+                // 2. ragContext: Relevant document chunks found by crossReference.ts
+                //    via pgvector similarity search (e.g., blood test showing low hemoglobin)
+                //
+                // Both are injected into the Mistral prompt so the AI can cross-reference
+                // symptoms with document findings in the executive summary.
+                const patterns = data.patterns || [];
+                const ragContext = data.ragContext || "";
+
+                // Format detected patterns for injection into the LLM prompt
+                const patternsBlock = patterns.length > 0
+                    ? `\n\nDetected Health Patterns (from embedding analysis):\n${patterns.map((p: any) => `- ${p.description} (${p.occurrences} occurrences, confidence: ${(p.confidence * 100).toFixed(0)}%)`).join('\n')}`
+                    : "";
+
+                // Format RAG-retrieved document context for injection
+                const ragBlock = ragContext
+                    ? `\n\nRelevant Medical Documents (from vector search):\n${ragContext}`
+                    : "";
+
                 const rawData = `
 Patient Data Summary:
 ${summaryText}
@@ -139,7 +163,7 @@ Check-ins (Summary/Notes):
 ${checkIns.map((c: any) => `- Mood: ${c.mood}, Energy: ${c.energy}, Sleep: ${c.sleep_hours}h. Summary: ${c.summary || c.notes || 'None'}`).join('\n')}
 
 Symptoms:
-${symptoms.map((s: any) => `- ${s.name} (Severity: ${s.severity})`).join('\n')}
+${symptoms.map((s: any) => `- ${s.name} (Severity: ${s.severity})`).join('\n')}${patternsBlock}${ragBlock}
 `;
                 // API call that summarises the text highlighting important/recurring negative information
                 const llmResponse = await mistral.chat.complete({
@@ -147,8 +171,11 @@ ${symptoms.map((s: any) => `- ${s.name} (Severity: ${s.severity})`).join('\n')}
                     messages: [
                         {
                             role: "system",
-                            content: `You are a medical reporting assistant. Your task is to summarize the provided patient data and explicitly highlight any important or recurring negative information (e.g., specific symptoms, consistently poor sleep, low energy). 
-Keep it to a concise, professional 3-4 sentence executive summary. Do not use markdown formatting. Do not overuse em dashes, and do not include numbers.`,
+                            content: `You are a medical reporting assistant generating a doctor-ready health brief. Your task is to summarize the provided patient data and explicitly highlight any important or recurring negative information (e.g., specific symptoms, consistently poor sleep, low energy).
+
+Cross-reference symptoms with document findings where possible. Example: "Patient reported recurring fatigue (5 occurrences). Blood panel from [date] showed hemoglobin at 11.2 g/dL, consistent with iron deficiency as a contributing factor."
+
+Keep it to a concise, professional 4-6 sentence executive summary. Do not use markdown formatting. Do not overuse em dashes.`,
                         },
                         {
                             role: "user",

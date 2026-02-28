@@ -15,6 +15,17 @@ export const mistral = new Proxy({} as Mistral, {
   get: (_, prop) => getMistral()[prop as keyof Mistral],
 });
 
+/**
+ * Generate a 1024-dimensional embedding vector for the given text.
+ *
+ * This is the foundation of the RAG system — every piece of health data
+ * (check-in summaries, document chunks, document full-text) gets embedded
+ * into the same vector space so we can find semantically similar content
+ * via pgvector cosine similarity in Supabase.
+ *
+ * Used by: checkin creation, document upload, document chunking pipeline,
+ * and cross-reference queries (findRelatedContext).
+ */
 export async function embedText(text: string): Promise<number[]> {
   const result = await getMistral().embeddings.create({
     model: "mistral-embed",
@@ -52,7 +63,11 @@ export async function extractCheckinData(
         role: "system",
         content: `You are a health data extraction assistant. Given a voice check-in transcript, extract structured health data.
         
-The summary will be sent to a text embedding model to power future health analytics and pattern recognition. Cover the following topics if mentioned: symptoms, mood, energy levels, food intake, sleep, and any other health-related observations. Be concise but informative.
+IMPORTANT: The summary field will be sent to a text embedding model (mistral-embed) to power
+the RAG vector search system. A good summary produces a good embedding, which means better
+pattern detection and cross-referencing with medical documents. Cover the following topics
+if mentioned: symptoms, mood, energy levels, food intake, sleep, and any other health-related
+observations. Be concise but informative — aim for maximum semantic density.
 
 - summary: 4-6 sentence clean summary of the person's health today
 - mood: one word or short phrase e.g. "anxious", "good", "tired", null if not mentioned
@@ -78,18 +93,35 @@ The summary will be sent to a text embedding model to power future health analyt
   return validated;
 }
 
+/**
+ * Generate a system prompt for the voice/chat AI based on recent check-in history.
+ *
+ * RAG enhancement: The optional `relevantContext` parameter receives the output of
+ * findRelatedContext() — vector-searched document chunks and past check-ins that are
+ * semantically related to the user's recent health state. This context is appended
+ * to the prompt so the AI can reference specific lab results, prescriptions, etc.
+ * For example: "You know from their recent blood test that hemoglobin was 11.2 g/dL."
+ */
 export async function generateConversationContext(
   checkIns: { date: string; data: CheckInExtraction }[],
+  relevantContext?: string,
 ): Promise<string> {
   const client = getMistral();
+
+  // If RAG context is available, append it as a clearly labeled block.
+  // The instruction tells the AI to weave it naturally into conversation
+  // rather than dumping all findings at once.
+  const relevantContextBlock = relevantContext
+    ? `\n\nRELEVANT HEALTH CONTEXT FROM PATIENT RECORDS:\n${relevantContext}\n\nUse this context naturally in conversation — reference specific past symptoms, document findings, or patterns when relevant. Don't dump all information at once; bring it up when the patient mentions something related.`
+    : "";
 
   const response = await client.chat.complete({
     model: "mistral-large-latest",
     messages: [
       {
         role: "system",
-        content: `You are generating a system prompt for a conversational health AI assistant. 
-        
+        content: `You are generating a system prompt for a conversational health AI assistant.
+
 Your output will be injected directly as a system prompt into a voice-based AI that is about to start a daily health check-in conversation with the user.
 
 The system prompt you write should:
@@ -98,8 +130,9 @@ The system prompt you write should:
 - Use natural relative time references like "this morning", "yesterday", "3 days ago", "last Friday" — never raw dates
 - Highlight any patterns, recurring symptoms, or notable changes across the week
 - Flag anything concerning so the AI can gently follow up
+- If relevant medical documents or past health records are provided, incorporate those findings naturally (e.g. "You know from their recent blood test that...")
 - Be concise — this is a system prompt, not an essay. Aim for 150-250 words.
-- Do NOT invent information not present in the check-in data`,
+- Do NOT invent information not present in the check-in data or provided context`,
       },
       {
         role: "user",
@@ -117,7 +150,7 @@ ${checkIns
 - Notes: ${data.notes ?? "none"}
 - Flagged: ${data.flagged ? `Yes — ${data.flag_reason}` : "No"}`,
   )
-  .join("\n\n")}
+  .join("\n\n")}${relevantContextBlock}
 
 Write a system prompt for the conversational AI that will speak with this user right now.`,
       },

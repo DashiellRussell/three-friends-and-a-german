@@ -7,6 +7,9 @@ import {
   getConversationDetails,
 } from "../services/elevenlabs";
 import { requireAuth } from "../middleware/auth";
+// RAG import: findRelatedContext searches document chunks + check-ins by vector similarity
+// Used here to inject relevant medical history into WebRTC voice session dynamic variables
+import { findRelatedContext } from "../services/crossReference";
 
 const router = Router();
 
@@ -466,13 +469,35 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       .eq("id", userId)
       .single();
 
+    // RAG enrichment for the WebRTC voice session:
+    // Search for relevant medical documents and past check-ins using vector similarity.
+    // The resulting context string gets passed as a dynamic variable (`health_context`)
+    // to the ElevenLabs voice agent, so it can reference specific medical findings
+    // during the real-time conversation (e.g., "I see from your blood test that...").
+    let healthContext = "";
+    try {
+      const related = await findRelatedContext(
+        `recent health concerns for ${profile?.display_name || "user"}`,
+        userId,
+        { limit: 3, includeDocuments: true, includeCheckins: true },
+      );
+      if (related.combinedContext) {
+        healthContext = related.combinedContext;
+      }
+    } catch (err) {
+      console.error("[voice/signed-url] RAG context failed (non-blocking):", (err as Error).message);
+    }
+
     const signedUrl = await getSignedUrl(agentId);
     res.json({
       signed_url: signedUrl,
+      // Dynamic variables are injected into the ElevenLabs agent's system prompt.
+      // health_context contains the RAG-retrieved medical history.
       dynamic_variables: {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
         allergies: profile?.allergies?.join(", ") || "none listed",
+        ...(healthContext ? { health_context: healthContext } : {}),
       },
     });
   } catch (err) {
