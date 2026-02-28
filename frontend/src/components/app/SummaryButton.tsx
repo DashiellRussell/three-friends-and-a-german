@@ -2,28 +2,18 @@
 
 import { useState } from "react";
 
-export function TestEmbedButton() {
+export function SummaryButton() {
   const [status, setStatus] = useState<string | null>(null);
 
   async function handleClick() {
     setStatus("loading...");
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/summary`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            transcript: `AI: Morning Nick, how are you feeling today?
-Nick: Pretty good actually, I think I'm mostly over it. Just a bit of residual congestion.
-AI: Great recovery. How did you sleep?
-Nick: Really well, like 8 hours. First proper sleep in days.
-AI: Energy?
-Nick: 7 out of 10. Went for a short walk outside, felt good to move.
-AI: And food?
-Nick: Back to normal. Had oats for breakfast, chicken and rice for dinner. Cooked properly for the first time this week.
-AI: Glad to hear it. Anything else?
-Nick: No I think I'm good. Just going to ease back into the gym tomorrow maybe.`,
             user_id: "51b5ade8-77df-4379-95f5-404685a44980",
           }),
         },
@@ -45,7 +35,7 @@ Nick: No I think I'm good. Just going to ease back into the gym tomorrow maybe.`
         onClick={handleClick}
         className="rounded-full bg-zinc-900 px-6 py-2 text-sm font-medium text-white hover:bg-zinc-700"
       >
-        Test Embed
+        Generate Summary
       </button>
       {status && <p className="text-xs text-zinc-500">{status}</p>}
     </div>

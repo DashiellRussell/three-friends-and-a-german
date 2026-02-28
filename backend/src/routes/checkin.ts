@@ -1,5 +1,10 @@
 import { Router, Request, Response } from "express";
-import { extractCheckinData, embedText } from "../services/mistral";
+import {
+  extractCheckinData,
+  embedText,
+  CheckInExtraction,
+  generateConversationContext,
+} from "../services/mistral";
 import { supabase } from "../services/supabase";
 
 const router = Router();
@@ -46,5 +51,66 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   res.status(201).json({ checkin: data });
 });
+
+router.post(
+  "/summary",
+  async (req: Request<{}, {}, { user_id: string }>, res: Response) => {
+    const { user_id } = req.body;
+
+    if (!user_id) {
+      res.status(400).json({ error: "user_id is required" });
+      return;
+    }
+
+    // Load last 7 days of check-ins for this user
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: checkIns, error } = await supabase
+      .from("check_ins")
+      .select(
+        "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
+      )
+      .eq("user_id", user_id)
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    if (!checkIns || checkIns.length === 0) {
+      res.json({
+        context: null,
+        message: "No check-ins found for the past 7 days",
+      });
+      return;
+    }
+
+    // Map each entry to a human-readable date label
+    const now = new Date();
+    const mapped = checkIns.map((entry) => {
+      const entryDate = new Date(entry.created_at);
+      const diffMs = now.getTime() - entryDate.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      let dateLabel: string;
+      if (diffDays === 0) {
+        dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+      } else if (diffDays === 1) {
+        dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+      } else {
+        dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
+      }
+
+      return {
+        date: dateLabel,
+        data: entry as CheckInExtraction,
+      };
+    });
+
+    const context = await generateConversationContext(mapped);
+
+    res.json({ context });
+  },
+);
 
 export default router;

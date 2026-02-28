@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { TestEmbedButton } from "@/components/app/TestEmbed";
 import type { ReactNode } from "react";
+import { SummaryButton } from "@/components/app/SummaryButton";
 
 // ─── Feature Card ────────────────────────────────────────────
 function FeatureCard({
@@ -293,6 +294,7 @@ export default function Home() {
 
       <div>Hi</div>
       <TestEmbedButton />
+      <SummaryButton />
 
       {/* Footer */}
       <footer className="border-t border-zinc-100 bg-white px-6 py-8">
