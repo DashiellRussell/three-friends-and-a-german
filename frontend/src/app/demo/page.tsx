@@ -6,7 +6,7 @@ import { Dashboard } from "@/components/app/dashboard";
 import { Log } from "@/components/app/log";
 import { Trends } from "@/components/app/trends";
 import { Profile } from "@/components/app/profile";
-import { InputOverlay } from "@/components/app/input-overlay";
+import { NewEntryPopup } from "@/components/app/new-entry-popup";
 
 type Tab = "dashboard" | "log" | "trends" | "profile";
 
@@ -142,7 +142,7 @@ export default function DemoPage() {
       </div>
 
       {/* Input overlay */}
-      {inputOpen && <InputOverlay onClose={() => setInputOpen(false)} />}
+      {inputOpen && <NewEntryPopup onClose={() => setInputOpen(false)} />}
     </div>
   );
 }
