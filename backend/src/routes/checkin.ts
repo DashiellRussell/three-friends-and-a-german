@@ -4,6 +4,8 @@ import {
   embedText,
   CheckInExtraction,
   generateConversationContext,
+  generateChatReply,
+  generateChatOpener,
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
 
@@ -109,7 +111,56 @@ router.post(
 
     const context = await generateConversationContext(mapped);
 
-    res.json({ context });
+    res.json({
+      context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
+          Give just a quick warm opening greeting, then immediately jump into the health check-in conversation. Follow these rules:
+- Keep every response to 3-4 sentences maximum
+- Follow this agenda in order: energy → mood → sleep hours → any symptoms or notes (optionally food too if it seems relevant)
+- Ask only one question at a time
+- Once all agenda items are covered, wrap up warmly in one sentence
+- Never give medical advice
+- Do not engage in small talk or ask questions outside the agenda until the agenda is fully covered`,
+    });
+  },
+);
+
+interface ChatStartBody {
+  systemPrompt: string;
+}
+
+router.post(
+  "/chat/start",
+  async (req: Request<{}, {}, ChatStartBody>, res: Response) => {
+    const { systemPrompt } = req.body;
+    if (!systemPrompt) {
+      res.status(400).json({ error: "systemPrompt is required" });
+      return;
+    }
+    const message = await generateChatOpener(systemPrompt);
+    res.json({ message });
+  },
+);
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface ChatMessageBody {
+  systemPrompt: string;
+  history: ChatMessage[];
+}
+
+router.post(
+  "/chat/message",
+  async (req: Request<{}, {}, ChatMessageBody>, res: Response) => {
+    const { systemPrompt, history } = req.body;
+    if (!systemPrompt || !history) {
+      res.status(400).json({ error: "systemPrompt and history are required" });
+      return;
+    }
+    const message = await generateChatReply(systemPrompt, history);
+    res.json({ message });
   },
 );
 

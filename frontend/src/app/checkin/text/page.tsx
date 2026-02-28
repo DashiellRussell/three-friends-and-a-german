@@ -4,30 +4,99 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import axios from "axios";
 
+function TypingIndicator() {
+  return (
+    <div
+      className="flex justify-start"
+      style={{ animation: "fadeUp 0.2s ease" }}
+    >
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-zinc-100 bg-white px-4 py-3">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-300"
+            style={{
+              animation: "bounce 1.2s infinite ease-in-out",
+              animationDelay: `${i * 0.15}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TextCheckinPage() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<
-    { role: "ai" | "user"; text: string }[]
+    { role: "assistant" | "user"; text: string }[]
   >([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+
+  const [systemContext, setSystemContext] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadContext = async () => {
+      const { data } = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/summary`,
+        { user_id: "51b5ade8-77df-4379-95f5-404685a44980" },
+      );
+      const context = data.context ?? null;
+      setSystemContext(context);
+      if (context) {
+        const { data: opener } = await axios.post(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/chat/start`,
+          { systemPrompt: context },
+        );
+        setMessages([{ role: "assistant", text: opener.message }]);
+        setIsLoading(false);
+        setInitializing(false);
+      }
+    };
+
+    loadContext();
+  }, []);
 
   useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
+
+  // Auto-focus input when loading finishes
+  useEffect(() => {
+    if (!isLoading && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isLoading]);
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || !systemContext || isLoading) return;
 
-    setMessages((prev) => [...prev, { role: "user", text }]);
+    const updatedMessages = [...messages, { role: "user" as const, text }];
+    setMessages(updatedMessages);
     setInput("");
+    setIsLoading(true);
 
-    // TODO: Send text to backend check-in API and stream/display the AI response.
-    // POST to ${NEXT_PUBLIC_BACKEND_URL}/api/checkin with { message: text }
-    // Then push the AI response into setMessages.
+    const history = updatedMessages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+
+    const { data } = await axios.post(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/chat/message`,
+      { systemPrompt: systemContext, history },
+    );
+
+    setMessages((prev) => [...prev, { role: "assistant", text: data.message }]);
+    setIsLoading(false);
   };
+
+  const canSend = input.trim() && !isLoading;
 
   return (
     <div className="fixed inset-0 z-100 flex flex-col bg-[#fafafa]">
@@ -67,41 +136,79 @@ export default function TextCheckinPage() {
         ref={chatRef}
         className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-3"
       >
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            style={{ animation: "fadeUp 0.2s ease" }}
-          >
+        {/* Initial loading state */}
+        {initializing && (
+          <div className="flex flex-1 items-center justify-center">
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed ${
-                m.role === "user"
-                  ? "rounded-br-sm bg-zinc-900 text-zinc-50"
-                  : "rounded-bl-sm border border-zinc-100 bg-white text-zinc-700"
-              }`}
+              className="flex flex-col items-center gap-3"
+              style={{ animation: "fadeIn 0.3s ease" }}
             >
-              {m.text}
+              <div className="flex items-center gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="inline-block h-2 w-2 rounded-full bg-zinc-300"
+                    style={{
+                      animation: "bounce 1.2s infinite ease-in-out",
+                      animationDelay: `${i * 0.15}s`,
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-[13px] text-zinc-400">
+                Preparing your check-in…
+              </span>
             </div>
           </div>
-        ))}
+        )}
+
+        {!initializing &&
+          messages.map((m, i) => (
+            <div
+              key={i}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              style={{
+                animation: "fadeUp 0.25s ease both",
+                animationDelay: i === messages.length - 1 ? "0.05s" : "0s",
+              }}
+            >
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed ${
+                  m.role === "user"
+                    ? "rounded-br-sm bg-zinc-900 text-zinc-50"
+                    : "rounded-bl-sm border border-zinc-100 bg-white text-zinc-700"
+                }`}
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+
+        {/* Typing indicator when waiting for AI response */}
+        {isLoading && !initializing && <TypingIndicator />}
       </div>
 
       {/* Input */}
       <div className="flex gap-2.5 border-t border-zinc-100 bg-white/90 px-5 py-3 backdrop-blur-lg">
         <input
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          placeholder="Describe how you're feeling…"
-          className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+          placeholder={
+            isLoading ? "Waiting for response…" : "Describe how you're feeling…"
+          }
+          disabled={isLoading}
+          className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 outline-none transition-all placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         />
         <button
           onClick={sendMessage}
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all ${
-            input.trim()
-              ? "bg-zinc-900 text-white"
+          disabled={!canSend}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
+            canSend
+              ? "bg-zinc-900 text-white active:scale-95"
               : "bg-zinc-100 text-zinc-300"
-          }`}
+          } disabled:cursor-not-allowed`}
         >
           <svg
             width="18"

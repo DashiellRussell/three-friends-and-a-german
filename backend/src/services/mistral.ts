@@ -125,3 +125,39 @@ Write a system prompt for the conversational AI that will speak with this user r
 
   return content;
 }
+
+export async function generateChatOpener(
+  systemPrompt: string,
+): Promise<string> {
+  console.log("Generating chat opener with system prompt:", systemPrompt);
+  const client = getMistral();
+  const response = await client.chat.complete({
+    model: "mistral-large-latest",
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      { role: "user", content: "__start__" }, // triggers the AI to speak first
+    ],
+  });
+  const content = response.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string")
+    throw new Error("No opener generated");
+  return content;
+}
+
+export async function generateChatReply(
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+): Promise<string> {
+  const client = getMistral();
+  const response = await client.chat.complete({
+    model: "mistral-large-latest",
+    messages: [{ role: "system", content: systemPrompt }, ...history],
+  });
+  const content = response.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string")
+    throw new Error("No reply generated");
+  return content;
+}
