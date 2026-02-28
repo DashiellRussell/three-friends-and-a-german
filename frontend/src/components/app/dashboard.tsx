@@ -10,6 +10,7 @@ interface CriticalAlert {
   name: string;
   severity: number;
   created_at: string;
+  check_in_id: string | null;
 }
 
 function getGreeting(): string {
@@ -27,7 +28,7 @@ function formatDate(): string {
   });
 }
 
-export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
+export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) => void }) {
   const { user } = useUser();
   const last7 = CHECKINS.slice(0, 7).reverse();
   const firstName = user?.display_name?.split(" ")[0] || "there";
@@ -83,9 +84,10 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
           onClick={() => setPanelOpen(true)}
           className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white transition-all hover:border-zinc-300 hover:shadow-sm"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <circle cx="12" cy="15" r="0.5" fill="currentColor" stroke="none" />
           </svg>
           {alerts.length > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
@@ -119,12 +121,22 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
                 {alerts.map(alert => (
                   <div key={alert.id} className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-3.5">
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
-                    <div className="min-w-0 flex-1">
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => {
+                        if (alert.check_in_id) {
+                          setPanelOpen(false);
+                          goTo("log", alert.check_in_id);
+                        }
+                      }}
+                      disabled={!alert.check_in_id}
+                    >
                       <div className="text-[13px] font-medium text-zinc-900">{alert.name}</div>
                       <div className="mt-0.5 text-[11px] text-zinc-400">
                         Severity {alert.severity}/10 · {new Date(alert.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {alert.check_in_id && <span className="ml-1 text-zinc-300">· View check-in →</span>}
                       </div>
-                    </div>
+                    </button>
                     <button
                       onClick={() => dismiss(alert.id)}
                       className="shrink-0 text-[11px] font-medium text-zinc-400 hover:text-zinc-600"

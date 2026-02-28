@@ -22,6 +22,7 @@ export function LogTab({ checkIns, expanded, toggle }: LogTabProps) {
                 return (
                     <button
                         key={c.id}
+                        id={`checkin-${c.id}`}
                         onClick={() => toggle(c.id)}
                         className={`w-full rounded-2xl bg-white p-4 text-left transition-all hover:shadow-sm ${c.flagged ? "border border-amber-200/80 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
                     >

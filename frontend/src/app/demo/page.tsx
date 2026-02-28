@@ -99,6 +99,7 @@ function LoginScreen() {
 function DemoApp() {
   const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [targetCheckinId, setTargetCheckinId] = useState<string | null>(null);
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [callMode, setCallMode] = useState(false);
@@ -144,8 +145,8 @@ function DemoApp() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} />}
-        {tab === "log" && <Log />}
+        {tab === "dashboard" && <Dashboard goTo={(t, checkinId) => { setTab(t as Tab); setTargetCheckinId(checkinId ?? null); }} />}
+        {tab === "log" && <Log targetCheckinId={targetCheckinId} onTargetConsumed={() => setTargetCheckinId(null)} />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
       </div>

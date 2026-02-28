@@ -8,7 +8,7 @@ import { LogTab } from "./log-tab";
 import { FilesTab } from "./files-tab";
 import { ReportsTab } from "./reports-tab";
 
-export function Log() {
+export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: string | null; onTargetConsumed?: () => void }) {
   const { user } = useUser();
   const [tab, setTab] = useState<"log" | "files" | "reports">("log");
   const [expanded, setExpanded] = useState<number | string | null>(null);
@@ -43,6 +43,19 @@ export function Log() {
       .catch(console.error);
   }, [user, view, backendUrl]);
 
+  useEffect(() => {
+    if (!targetCheckinId || checkIns.length === 0) return;
+    const match = checkIns.find(c => c.id === targetCheckinId);
+    if (match) {
+      setTab("log");
+      setExpanded(match.id);
+      onTargetConsumed?.();
+      setTimeout(() => {
+        document.getElementById(`checkin-${match.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  }, [targetCheckinId, checkIns]);
+
   const toggle = (id: number | string) => setExpanded(expanded === id ? null : id);
 
   if (view === "report-config") {
@@ -58,7 +71,7 @@ export function Log() {
   }
 
   return (
-    <div className="px-5 pt-8 pb-[100px]">
+    <div className="px-5 pt-8 pb-25">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900">Health Data</h2>
