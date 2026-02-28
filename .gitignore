@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+node_modules
+
+# vibe local secrets and logs (commit .vibe/ config itself)
+.vibe/.env
+.vibe/logs/

@@ -1,0 +1,10 @@
+display_name = "Report Generation Specialist"
+description = """Work on the report generation agent: synthesise health timeline data into \
+one-page structured doctor reports (patient summary, symptom timeline, medication list, \
+document summaries, AI-identified trends, patient concerns). Output professional PDF via \
+RAG retrieval across all user data. Agent lives in backend/app/agents/report_generation.py."""
+active_model = "mistral-large-latest"
+safety = "safe"
+auto_approve = false
+
+enabled_tools = ["read_file", "write_file", "grep", "glob", "bash", "search_replace"]

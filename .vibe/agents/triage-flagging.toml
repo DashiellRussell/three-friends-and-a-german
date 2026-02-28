@@ -1,0 +1,12 @@
+display_name = "Triage & Flagging Specialist"
+description = """Work on the triage/flagging agent: evaluate symptom urgency using conservative \
+pattern matching + Mistral reasoning. Flag critical conditions (chest pain, breathing difficulty, \
+sudden vision loss, stroke signs, severe allergic reactions). Bias toward false positives over \
+false negatives. Trigger proactive outbound calls via Twilio when thresholds are met. \
+All flagging decisions must be logged and traceable via W&B Weave. \
+Agent lives in backend/app/agents/triage_flagging.py."""
+active_model = "mistral-large-latest"
+safety = "safe"
+auto_approve = false
+
+enabled_tools = ["read_file", "write_file", "grep", "glob", "bash", "search_replace"]

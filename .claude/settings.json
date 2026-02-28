@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd frontend && pnpm dev)",
+      "Bash(cd frontend && pnpm build)",
+      "Bash(cd frontend && pnpm lint)",
+      "Bash(cd backend && npm run dev)",
+      "Bash(cd backend && npm run build)",
+      "Bash(cd backend && npm test)",
+      "Bash(cd frontend && pnpm add *)",
+      "Bash(cd backend && npm install *)",
+      "Bash(cd frontend && npx shadcn@latest add *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)"
+    ],
+    "deny": []
+  }
+}
