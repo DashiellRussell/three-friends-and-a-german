@@ -35,24 +35,7 @@ router.get("/", async (req: Request, res: Response) => {
   res.json(data);
 });
 
-// Get single check-in by ID
-router.get("/:id", async (req: Request, res: Response) => {
-  const userId = req.userId!;
-  const { data, error } = await supabase
-    .from("check_ins")
-    .select("*, symptoms(*)")
-    .eq("id", req.params.id)
-    .eq("user_id", userId)
-    .single();
-
-  if (error) {
-    res.status(404).json({ error: "Check-in not found" });
-    return;
-  }
-  res.json(data);
-});
-
-// Dashboard stats summary
+// Dashboard stats summary — must be before /:id to avoid matching "stats" as an id
 router.get("/stats/summary", async (req: Request, res: Response) => {
   const userId = req.userId!;
   const days = parseInt(req.query.days as string) || 7;
@@ -87,6 +70,23 @@ router.get("/stats/summary", async (req: Request, res: Response) => {
     flagged_count: flaggedCount,
     streak: checkins.length,
   });
+});
+
+// Get single check-in by ID
+router.get("/:id", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("*, symptoms(*)")
+    .eq("id", req.params.id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    res.status(404).json({ error: "Check-in not found" });
+    return;
+  }
+  res.json(data);
 });
 
 interface CheckInBody {
