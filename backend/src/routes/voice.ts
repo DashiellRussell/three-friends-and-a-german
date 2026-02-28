@@ -1,6 +1,10 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../services/supabase";
-import { mistral } from "../services/mistral";
+import {
+  mistral,
+  generateConversationContext,
+  CheckInExtraction,
+} from "../services/mistral";
 import {
   getSignedUrl,
   initiateOutboundCall,
@@ -466,6 +470,55 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       .eq("id", userId)
       .single();
 
+    // Generate rich health context from last 7 days (same as text chat agent)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: checkIns } = await supabase
+      .from("check_ins")
+      .select(
+        "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
+      )
+      .eq("user_id", userId)
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true });
+
+    let recentHealthSummary = "No recent check-ins on file. This is a general wellness check-in.";
+
+    if (checkIns && checkIns.length > 0) {
+      const now = new Date();
+      const mapped = checkIns.map((entry) => {
+        const entryDate = new Date(entry.created_at);
+        const diffMs = now.getTime() - entryDate.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        let dateLabel: string;
+        if (diffDays === 0) {
+          dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+        } else if (diffDays === 1) {
+          dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+        } else {
+          dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
+        }
+
+        return {
+          date: dateLabel,
+          data: entry as CheckInExtraction,
+        };
+      });
+
+      try {
+        recentHealthSummary = await generateConversationContext(mapped);
+      } catch (err) {
+        console.error("[signed-url] Failed to generate conversation context:", (err as Error).message);
+        // Fall back to a basic summary
+        recentHealthSummary = checkIns
+          .slice(-3)
+          .map((c) => c.summary || c.notes || "check-in recorded")
+          .join(". ");
+      }
+    }
+
     const signedUrl = await getSignedUrl(agentId);
     res.json({
       signed_url: signedUrl,
@@ -473,6 +526,7 @@ router.get("/signed-url", async (req: Request, res: Response) => {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
         allergies: profile?.allergies?.join(", ") || "none listed",
+        recent_health_summary: recentHealthSummary,
       },
     });
   } catch (err) {
@@ -491,15 +545,20 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch recent check-ins for context (last 5)
+    // Generate rich, natural-language health context (same approach as text chat + voice check-in)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     const { data: recentCheckins } = await supabase
       .from("check_ins")
-      .select("transcript, notes, mood_rating, energy_level, created_at")
+      .select(
+        "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
+      )
       .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true });
 
-    // Fetch recent symptoms (not dismissed)
+    // Also fetch active symptoms for additional context
     const { data: symptoms } = await supabase
       .from("symptoms")
       .select("name, severity, body_area, is_critical, alert_level, alert_message, created_at")
@@ -508,26 +567,43 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
       .order("created_at", { ascending: false })
       .limit(10);
 
-    // Build a concise health summary for the agent
     let recentHealthSummary = "";
 
-    if (symptoms && symptoms.length > 0) {
-      const symptomLines = symptoms.map(
-        (s) => `- ${s.name} (severity: ${s.severity}/10, ${s.body_area || "general"}, ${s.is_critical ? "CRITICAL" : s.alert_level || "info"}, reported: ${new Date(s.created_at).toLocaleDateString()})`,
-      );
-      recentHealthSummary += `Active symptoms:\n${symptomLines.join("\n")}\n\n`;
+    if (recentCheckins && recentCheckins.length > 0) {
+      const now = new Date();
+      const mapped = recentCheckins.map((entry) => {
+        const entryDate = new Date(entry.created_at);
+        const diffMs = now.getTime() - entryDate.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        let dateLabel: string;
+        if (diffDays === 0) {
+          dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+        } else if (diffDays === 1) {
+          dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+        } else {
+          dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
+        }
+
+        return {
+          date: dateLabel,
+          data: entry as CheckInExtraction,
+        };
+      });
+
+      try {
+        recentHealthSummary = await generateConversationContext(mapped);
+      } catch (err) {
+        console.error("[outbound-call] Failed to generate conversation context:", (err as Error).message);
+      }
     }
 
-    if (recentCheckins && recentCheckins.length > 0) {
-      const checkinLines = recentCheckins.map((c) => {
-        const date = new Date(c.created_at).toLocaleDateString();
-        const parts = [];
-        if (c.mood_rating) parts.push(`mood: ${c.mood_rating}/10`);
-        if (c.energy_level) parts.push(`energy: ${c.energy_level}/10`);
-        if (c.notes) parts.push(c.notes.slice(0, 100));
-        return `- ${date}: ${parts.join(", ") || "check-in recorded"}`;
-      });
-      recentHealthSummary += `Recent check-ins:\n${checkinLines.join("\n")}`;
+    // Append active symptom info if available and not already captured in context
+    if (symptoms && symptoms.length > 0) {
+      const criticalSymptoms = symptoms.filter((s) => s.is_critical);
+      if (criticalSymptoms.length > 0) {
+        recentHealthSummary += `\n\nCRITICAL — actively flagged symptoms that need follow-up: ${criticalSymptoms.map((s) => s.name).join(", ")}.`;
+      }
     }
 
     if (!recentHealthSummary) {
