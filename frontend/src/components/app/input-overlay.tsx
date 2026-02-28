@@ -12,7 +12,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:300
 type Mode = null | "voice" | "chat" | "upload" | "calling";
 type TranscriptMsg = { role: "user" | "agent"; text: string };
 
-export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => void; startInVoiceMode?: boolean }) {
+export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { onClose: () => void; startInVoiceMode?: boolean; startInCallMode?: boolean }) {
   const { user } = useUser();
   const userId = user?.id || "";
   const [mode, setMode] = useState<Mode>(null);
@@ -193,14 +193,18 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
     }
   }, [userId, showToast]);
 
-  // Auto-start voice if requested
+  // Auto-start voice or call if requested
   const hasAutoStarted = useRef(false);
   useEffect(() => {
-    if (startInVoiceMode && !hasAutoStarted.current) {
+    if (hasAutoStarted.current) return;
+    if (startInVoiceMode) {
       hasAutoStarted.current = true;
       startVoice();
+    } else if (startInCallMode) {
+      hasAutoStarted.current = true;
+      startCall();
     }
-  }, [startInVoiceMode, startVoice]);
+  }, [startInVoiceMode, startInCallMode, startVoice, startCall]);
 
   // Auto-scroll transcript
   useEffect(() => {

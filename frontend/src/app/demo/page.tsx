@@ -101,6 +101,7 @@ function DemoApp() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [callMode, setCallMode] = useState(false);
 
   if (loading) {
     return (
@@ -201,9 +202,20 @@ function DemoApp() {
         )}
       </div>
 
-      {/* Input overlay — voice mode or new entry popup */}
-      {inputOpen && voiceMode && <InputOverlay onClose={() => { setInputOpen(false); setVoiceMode(false); }} startInVoiceMode={true} />}
-      {inputOpen && !voiceMode && <NewEntryPopup onClose={() => setInputOpen(false)} />}
+      {/* Input overlay — voice/call mode or new entry popup */}
+      {inputOpen && (voiceMode || callMode) && (
+        <InputOverlay
+          onClose={() => { setInputOpen(false); setVoiceMode(false); setCallMode(false); }}
+          startInVoiceMode={voiceMode}
+          startInCallMode={callMode}
+        />
+      )}
+      {inputOpen && !voiceMode && !callMode && (
+        <NewEntryPopup
+          onClose={() => setInputOpen(false)}
+          onCallMe={() => { setCallMode(true); setInputOpen(true); }}
+        />
+      )}
     </div>
   );
 }
