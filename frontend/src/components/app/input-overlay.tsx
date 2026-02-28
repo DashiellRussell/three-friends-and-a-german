@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useConversation } from "@elevenlabs/react";
-import { LAB_RESULTS, statusVariant } from "@/lib/mock-data";
-import { generateTestReport } from "@/lib/generate-test-report";
 import { useUser } from "@/lib/user-context";
-import { Pill, useToast } from "./shared";
+import { useToast } from "./shared";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
@@ -36,9 +34,10 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { o
   const textChatRef = useRef<HTMLDivElement>(null);
 
   // Upload state
-  const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "done">("idle");
-  const [progress, setProgress] = useState(0);
-  const [testReportStage, setTestReportStage] = useState<"idle" | "generating" | "done" | "fading" | "appearing">("idle");
+  const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "done" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedDoc, setUploadedDoc] = useState<{ file_name: string; summary: string | null; document_type: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track whether agent triggered auto-end
   const autoEndRef = useRef(false);
@@ -215,38 +214,54 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { o
     if (textChatRef.current) textChatRef.current.scrollTop = textChatRef.current.scrollHeight;
   }, [chatMsgs]);
 
-  // Generate test report
-  useEffect(() => {
-    if (testReportStage === "generating") {
-      const t = setTimeout(() => setTestReportStage("done"), 2000);
-      return () => clearTimeout(t);
-    }
-    if (testReportStage === "fading") {
-      const t = setTimeout(() => setTestReportStage("appearing"), 320);
-      return () => clearTimeout(t);
-    }
-  }, [testReportStage]);
+  // Handle file selection and upload
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!userId) return;
+    setUploadStage("uploading");
+    setUploadError(null);
+    setUploadedDoc(null);
 
-  // Upload progress
-  useEffect(() => {
-    if (uploadStage === "uploading") {
-      const iv = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 100) {
-            clearInterval(iv);
-            setUploadStage("processing");
-            return 100;
-          }
-          return p + 10;
-        });
-      }, 70);
-      return () => clearInterval(iv);
+    try {
+      // Read file text for AI processing (best-effort for PDFs)
+      let documentText = "";
+      if (file.type === "text/plain") {
+        documentText = await file.text();
+      } else {
+        // For PDFs and images, send the file name as placeholder text
+        // Server-side OCR/extraction would be needed for real text extraction
+        documentText = `Uploaded file: ${file.name}`;
+      }
+
+      setUploadStage("processing");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("document_text", documentText);
+      formData.append("file_name", file.name);
+      formData.append("document_type", "other");
+
+      const res = await fetch(`${BACKEND_URL}/api/documents/upload`, {
+        method: "POST",
+        headers: { "x-user-id": userId },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Upload failed (${res.status})`);
+      }
+
+      const doc = await res.json();
+      setUploadedDoc({ file_name: doc.file_name, summary: doc.summary, document_type: doc.document_type });
+      setUploadStage("done");
+      showToast("Document uploaded", "success", "Your document has been processed and saved");
+    } catch (err) {
+      const msg = (err as Error).message;
+      setUploadError(msg);
+      setUploadStage("error");
+      showToast(msg, "error");
     }
-    if (uploadStage === "processing") {
-      const t = setTimeout(() => setUploadStage("done"), 1600);
-      return () => clearTimeout(t);
-    }
-  }, [uploadStage]);
+  }, [userId, showToast]);
 
   const sendChat = () => {
     if (!chatText.trim()) return;
@@ -632,6 +647,17 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { o
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
       {ToastEl}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.heic"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileUpload(file);
+          e.target.value = "";
+        }}
+      />
       <div className="flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2.5">
           <button onClick={() => setMode(null)} className="text-zinc-400 transition-colors hover:text-zinc-600">
@@ -645,7 +671,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { o
       <div className="flex flex-col gap-[5%] px-5">
         {uploadStage === "idle" && (
           <button
-            onClick={() => setUploadStage("uploading")}
+            onClick={() => fileInputRef.current?.click()}
             className="flex w-full flex-col items-center rounded-2xl border-2 border-dashed border-zinc-200 bg-white p-14 transition-all hover:border-zinc-300 hover:shadow-sm"
           >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-50">
@@ -657,86 +683,58 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode }: { o
         )}
 
         {uploadStage === "uploading" && (
-          <div className="rounded-2xl border border-zinc-100 bg-white p-5" style={{ animation: "fadeUp 0.2s" }}>
-            <div className="mb-3 text-[13px] font-medium text-zinc-900">PathologyReport_Feb2026.pdf</div>
-            <div className="h-1 overflow-hidden rounded-full bg-zinc-100">
-              <div className="h-full rounded-full bg-zinc-900 transition-all duration-75" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="mt-2 text-[11px] text-zinc-400">{Math.min(progress, 100)}%</div>
+          <div className="flex flex-col items-center py-14" style={{ animation: "fadeUp 0.2s" }}>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-100 border-t-zinc-900" />
+            <div className="mt-4 text-xs text-zinc-400">Uploading…</div>
           </div>
         )}
 
         {uploadStage === "processing" && (
           <div className="flex flex-col items-center py-14">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-100 border-t-zinc-900" />
-            <div className="mt-4 text-xs text-zinc-400">Extracting findings…</div>
+            <div className="mt-4 text-xs text-zinc-400">Analysing document…</div>
           </div>
         )}
 
-        {uploadStage === "done" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div className="mb-4 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
-              <span className="text-[13px] font-medium text-zinc-900">Processed</span>
-            </div>
-            {LAB_RESULTS.map((r, i) => (
-              <div key={i} className="mb-2 flex items-center justify-between rounded-2xl border border-zinc-100 bg-white px-4 py-3">
-                <span className="text-[13px] text-zinc-700">
-                  <span className="font-medium">{r.metric}</span>{" "}
-                  <span className="text-zinc-400">{r.value}</span>
-                </span>
-                <Pill variant={statusVariant(r.status)}>{r.status}</Pill>
-              </div>
-            ))}
-            <div className="mt-2 rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/50 px-3.5 py-2.5 text-[11px] font-medium text-amber-700">
-              ⚠ HbA1c trending upward
-            </div>
-          </div>
-        )}
-
-        {uploadStage === "idle" && (testReportStage === "idle" || testReportStage === "appearing") && (
-          <button
-            onClick={() => setTestReportStage("generating")}
-            className="flex w-full flex-col items-center rounded-2xl border-2 border-dashed border-zinc-200 bg-white p-14 transition-all hover:border-zinc-300 hover:shadow-sm"
-            style={testReportStage === "appearing" ? { animation: "fadeUp 0.4s ease both" } : undefined}
-          >
-            <div className="text-sm font-medium text-zinc-900">Generate Test PDF</div>
-            <div className="mt-1 text-xs text-zinc-400">Blood tests, prescriptions, scans</div>
-          </button>
-        )}
-
-        {testReportStage === "generating" && (
-          <div className="flex flex-col items-center py-14" style={{ animation: "fadeUp 0.2s" }}>
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-100 border-t-zinc-900" />
-            <div className="mt-4 text-xs text-zinc-400">Generating report…</div>
-          </div>
-        )}
-
-        {(testReportStage === "done" || testReportStage === "fading") && (
-          <div
-            className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-100 bg-white px-5 py-6"
-            style={{ animation: testReportStage === "fading" ? "fadeDown 0.32s forwards" : "fadeUp 0.3s" }}
-          >
+        {uploadStage === "done" && uploadedDoc && (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-100 bg-white px-5 py-6" style={{ animation: "fadeUp 0.3s" }}>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <div className="text-[13px] font-medium text-zinc-900">Report generated</div>
-            <div className="text-[11px] text-zinc-400">Your test PDF is ready</div>
+            <div className="text-[13px] font-medium text-zinc-900">{uploadedDoc.file_name}</div>
+            {uploadedDoc.summary && (
+              <div className="text-[12px] leading-relaxed text-zinc-500 text-center">{uploadedDoc.summary}</div>
+            )}
             <div className="mt-1 flex w-full gap-2">
               <button
-                onClick={() => generateTestReport()}
+                onClick={() => { setUploadStage("idle"); setUploadedDoc(null); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-700 active:scale-[0.98]"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                Download PDF
+                Upload another
               </button>
               <button
-                onClick={() => setTestReportStage("fading")}
+                onClick={onClose}
                 className="flex flex-1 items-center justify-center rounded-xl border border-zinc-200 py-2.5 text-[13px] font-medium text-zinc-600 transition-all hover:bg-zinc-50 active:scale-[0.98]"
               >
                 Done
               </button>
             </div>
+          </div>
+        )}
+
+        {uploadStage === "error" && (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-red-100 bg-white px-5 py-6" style={{ animation: "fadeUp 0.3s" }}>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </div>
+            <div className="text-[13px] font-medium text-zinc-900">Upload failed</div>
+            <div className="text-[12px] text-zinc-500 text-center">{uploadError}</div>
+            <button
+              onClick={() => { setUploadStage("idle"); setUploadError(null); }}
+              className="mt-1 rounded-xl bg-zinc-900 px-6 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-700 active:scale-[0.98]"
+            >
+              Try again
+            </button>
           </div>
         )}
       </div>

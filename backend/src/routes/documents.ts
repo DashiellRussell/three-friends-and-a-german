@@ -4,6 +4,8 @@ import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
 
+const DOCUMENT_BUCKET = "uploads";
+
 const router = Router();
 router.use(requireAuth);
 
@@ -26,6 +28,40 @@ router.get("/", async (req: Request, res: Response) => {
     return;
   }
   res.json({ documents: data });
+});
+
+// GET /api/documents/:id/download — download document via signed URL
+router.get("/:id/download", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  const { data: doc, error } = await supabase
+    .from("documents")
+    .select("file_url")
+    .eq("id", req.params.id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    res.status(error.code === "PGRST116" ? 404 : 500).json({ error: error.message });
+    return;
+  }
+
+  if (!doc.file_url) {
+    res.status(404).json({ error: "Document file not available" });
+    return;
+  }
+
+  // file_url stores the storage path (e.g. "userId/timestamp-filename.pdf")
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from(DOCUMENT_BUCKET)
+    .createSignedUrl(doc.file_url, 3600); // 1 hour expiry
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    res.status(500).json({ error: "Failed to generate download URL" });
+    return;
+  }
+
+  res.json({ url: signedUrlData.signedUrl });
 });
 
 // GET /api/documents/:id — single document with full details
@@ -61,24 +97,19 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
   const docType = validTypes.includes(document_type) ? document_type : "other";
   const fileName = file_name ?? file?.originalname ?? "document.pdf";
 
-  // Upload PDF to Supabase Storage if a file was provided
-  let fileUrl = "";
+  // Upload file to Supabase Storage (private bucket) if a file was provided
+  // Store the storage path, not the public URL
+  let storagePath = "";
   if (file) {
-    const storagePath = `${userId}/${Date.now()}-${fileName}`;
+    storagePath = `${userId}/${Date.now()}-${fileName}`;
     const { error: storageError } = await supabase.storage
-      .from("medical-documents")
-      .upload(storagePath, file.buffer, { contentType: "application/pdf" });
+      .from(DOCUMENT_BUCKET)
+      .upload(storagePath, file.buffer, { contentType: file.mimetype || "application/pdf" });
 
     if (storageError) {
       res.status(500).json({ error: storageError.message });
       return;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from("medical-documents")
-      .getPublicUrl(storagePath);
-
-    fileUrl = publicUrl;
   }
 
   const [summary, embedding] = await Promise.all([
@@ -91,8 +122,8 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     .insert({
       user_id: userId,
       file_name: fileName,
-      file_url: fileUrl,
-      file_type: "application/pdf",
+      file_url: storagePath, // storage path, not a public URL
+      file_type: file?.mimetype || "application/pdf",
       document_type: docType,
       summary,
       embedding,
