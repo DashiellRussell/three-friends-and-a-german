@@ -1,10 +1,13 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
 
 const router = Router();
 router.use(requireAuth);
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET /api/documents — list user's documents
 router.get("/", async (req: Request, res: Response) => {
@@ -44,9 +47,10 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // POST /api/documents/upload — upload a medical document
-router.post("/upload", async (req: Request, res: Response) => {
+router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   const userId = req.userId!;
   const { document_text, file_name, document_type } = req.body;
+  const file = req.file;
 
   if (!document_text) {
     res.status(400).json({ error: "document_text is required" });
@@ -55,6 +59,27 @@ router.post("/upload", async (req: Request, res: Response) => {
 
   const validTypes = ["lab_report", "prescription", "imaging", "discharge_summary", "other"];
   const docType = validTypes.includes(document_type) ? document_type : "other";
+  const fileName = file_name ?? file?.originalname ?? "document.pdf";
+
+  // Upload PDF to Supabase Storage if a file was provided
+  let fileUrl = "";
+  if (file) {
+    const storagePath = `${userId}/${Date.now()}-${fileName}`;
+    const { error: storageError } = await supabase.storage
+      .from("medical-documents")
+      .upload(storagePath, file.buffer, { contentType: "application/pdf" });
+
+    if (storageError) {
+      res.status(500).json({ error: storageError.message });
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("medical-documents")
+      .getPublicUrl(storagePath);
+
+    fileUrl = publicUrl;
+  }
 
   const [summary, embedding] = await Promise.all([
     summarizeDocument(document_text),
@@ -65,8 +90,8 @@ router.post("/upload", async (req: Request, res: Response) => {
     .from("documents")
     .insert({
       user_id: userId,
-      file_name: file_name ?? "document.pdf",
-      file_url: "",
+      file_name: fileName,
+      file_url: fileUrl,
       file_type: "application/pdf",
       document_type: docType,
       summary,
