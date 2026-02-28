@@ -26,6 +26,9 @@ importers:
       multer:
         specifier: ^1.4.5-lts.2
         version: 1.4.5-lts.2
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/cors':
         specifier: ^2.8.17

@@ -42,18 +42,41 @@ export default function DemoPage() {
     <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-[#fafafa] font-sans">
       {/* Top bar */}
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 bg-white/80 px-5 py-3 backdrop-blur-lg">
-        <Link href="/" className="flex items-center gap-2 text-zinc-400 transition-colors hover:text-zinc-600">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-zinc-400 transition-colors hover:text-zinc-600"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
           <span className="text-xs font-medium">Back</span>
         </Link>
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
             </svg>
           </div>
-          <span className="text-sm font-semibold tracking-tight text-zinc-900">Kira</span>
+          <span className="text-sm font-semibold tracking-tight text-zinc-900">
+            Kira
+          </span>
         </div>
         <div className="w-12" />
       </div>
@@ -75,7 +98,15 @@ export default function DemoPage() {
               onClick={() => setInputOpen(true)}
               className="flex h-12 w-12 -translate-y-1.5 items-center justify-center rounded-full bg-zinc-900 shadow-lg shadow-zinc-900/10 transition-transform active:scale-95"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
@@ -88,14 +119,25 @@ export default function DemoPage() {
                 tab === item.id ? "text-zinc-900" : "text-zinc-300"
               }`}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d={item.d} />
               </svg>
-              <span className={`text-[10px] ${tab === item.id ? "font-semibold" : "font-normal"}`}>
+              <span
+                className={`text-[10px] ${tab === item.id ? "font-semibold" : "font-normal"}`}
+              >
                 {item.label}
               </span>
             </button>
-          )
+          ),
         )}
       </div>
 

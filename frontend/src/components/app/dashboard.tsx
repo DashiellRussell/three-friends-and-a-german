@@ -7,7 +7,7 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
   const last7 = CHECKINS.slice(0, 7).reverse();
 
   return (
-    <div className="px-5 pt-8 pb-[100px]">
+    <div className="px-5 pt-8 pb-25">
       {/* Greeting */}
       <div className="mb-8">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
@@ -21,7 +21,7 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
       {/* Alert card */}
       <button
         onClick={() => goTo("log")}
-        className="mb-6 w-full rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/50 p-4 text-left transition-all hover:shadow-md hover:shadow-amber-100/50"
+        className="mb-6 w-full rounded-2xl border border-amber-200/80 bg-linear-to-br from-amber-50 to-orange-50/50 p-4 text-left transition-all hover:shadow-md hover:shadow-amber-100/50"
       >
         <div className="mb-1.5 flex items-center gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -61,7 +61,9 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
       {/* Energy sparkline */}
       <div className="mb-4 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-zinc-900">Energy</span>
+          <span className="text-[13px] font-semibold text-zinc-900">
+            Energy
+          </span>
           <button
             onClick={() => goTo("trends")}
             className="text-[12px] font-medium text-zinc-400 transition-colors hover:text-zinc-600"
