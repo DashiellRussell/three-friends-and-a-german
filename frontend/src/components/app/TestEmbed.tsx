@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import axios from "axios";
 
 export function TestEmbedButton() {
   const [status, setStatus] = useState<string | null>(null);
@@ -8,13 +9,10 @@ export function TestEmbedButton() {
   async function handleClick() {
     setStatus("loading...");
     try {
-      const res = await fetch(
+      const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            transcript: `AI: Morning Nick, how are you feeling today?
+          transcript: `AI: Morning Nick, how are you feeling today?
 Nick: Pretty good actually, I think I'm mostly over it. Just a bit of residual congestion.
 AI: Great recovery. How did you sleep?
 Nick: Really well, like 8 hours. First proper sleep in days.
@@ -24,16 +22,10 @@ AI: And food?
 Nick: Back to normal. Had oats for breakfast, chicken and rice for dinner. Cooked properly for the first time this week.
 AI: Glad to hear it. Anything else?
 Nick: No I think I'm good. Just going to ease back into the gym tomorrow maybe.`,
-            user_id: "51b5ade8-77df-4379-95f5-404685a44980",
-          }),
+          user_id: "51b5ade8-77df-4379-95f5-404685a44980",
         },
       );
-      const data = await res.json();
-      setStatus(
-        res.ok
-          ? "✅ success: " + JSON.stringify(data)
-          : "❌ " + JSON.stringify(data),
-      );
+      setStatus("✅ success: " + JSON.stringify(data));
     } catch (e) {
       setStatus("❌ " + String(e));
     }

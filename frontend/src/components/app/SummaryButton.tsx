@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import axios from "axios";
 
 export function SummaryButton() {
   const [status, setStatus] = useState<string | null>(null);
@@ -8,22 +9,11 @@ export function SummaryButton() {
   async function handleClick() {
     setStatus("loading...");
     try {
-      const res = await fetch(
+      const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/summary`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: "51b5ade8-77df-4379-95f5-404685a44980",
-          }),
-        },
+        { user_id: "51b5ade8-77df-4379-95f5-404685a44980" },
       );
-      const data = await res.json();
-      setStatus(
-        res.ok
-          ? "✅ success: " + JSON.stringify(data)
-          : "❌ " + JSON.stringify(data),
-      );
+      setStatus("✅ success: " + JSON.stringify(data));
     } catch (e) {
       setStatus("❌ " + String(e));
     }

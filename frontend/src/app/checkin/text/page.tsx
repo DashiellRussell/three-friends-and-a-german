@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import axios from "axios";
 
 export default function TextCheckinPage() {
   const [input, setInput] = useState("");
