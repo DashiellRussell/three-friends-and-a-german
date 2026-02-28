@@ -1,0 +1,10 @@
+display_name = "Symptom Extraction Specialist"
+description = """Work on the symptom extraction agent: parse voice transcripts into structured \
+health data (symptoms with body location, severity 1-10, duration, onset pattern), \
+mood/energy/sleep scores, and medication adherence. Output must be Pydantic models. \
+Agent lives in backend/app/agents/symptom_extraction.py."""
+active_model = "mistral-large-latest"
+safety = "safe"
+auto_approve = false
+
+enabled_tools = ["read_file", "write_file", "grep", "glob", "bash", "search_replace"]

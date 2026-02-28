@@ -1,0 +1,11 @@
+display_name = "Document Analysis Specialist"
+description = """Work on the document analysis agent: process uploaded medical documents \
+(blood tests, prescriptions, discharge summaries, imaging reports) through the RAG pipeline. \
+Chunk documents, generate Mistral embeddings, store in pgvector, and produce contextual summaries. \
+Handle both PDF text extraction and OCR via Mistral Vision/Pixtral for image uploads. \
+Agent lives in backend/app/agents/document_analysis.py."""
+active_model = "mistral-large-latest"
+safety = "safe"
+auto_approve = false
+
+enabled_tools = ["read_file", "write_file", "grep", "glob", "bash", "search_replace"]
