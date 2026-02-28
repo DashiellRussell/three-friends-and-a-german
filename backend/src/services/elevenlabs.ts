@@ -22,7 +22,7 @@ export async function initiateOutboundCall(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      agent_id: process.env.ELEVENLABS_AGENT_ID,
+      agent_id: process.env.ELEVENLABS_OUTBOUND_AGENT_ID || process.env.ELEVENLABS_AGENT_ID,
       agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
       to_number: toNumber,
       conversation_initiation_client_data: {

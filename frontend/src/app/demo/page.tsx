@@ -60,7 +60,7 @@ export default function DemoPage() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} />}
+        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => setInputOpen(true)} />}
         {tab === "log" && <Log />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}

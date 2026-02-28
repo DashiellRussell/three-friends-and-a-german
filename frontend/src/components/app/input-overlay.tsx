@@ -1,56 +1,59 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { CONVERSATION, LAB_RESULTS, statusVariant } from "@/lib/mock-data";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useConversation } from "@elevenlabs/react";
+import { LAB_RESULTS, statusVariant } from "@/lib/mock-data";
 import { generateTestReport } from "@/lib/generate-test-report";
 import { Pill } from "./shared";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
 type Mode = null | "voice" | "chat" | "upload";
+type TranscriptMsg = { role: "user" | "agent"; text: string };
 
 export function InputOverlay({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<Mode>(null);
-  const [msgs, setMsgs] = useState<typeof CONVERSATION>([]);
-  const [idx, setIdx] = useState(0);
-  const [speaking, setSpeaking] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [done, setDone] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptMsg[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  // Text chat state
   const [chatText, setChatText] = useState("");
   const [chatMsgs, setChatMsgs] = useState<{ role: "ai" | "user"; text: string }[]>([
     { role: "ai", text: "Hi! Tell me how you're feeling, any symptoms, or ask me anything about your health." },
   ]);
+  const textChatRef = useRef<HTMLDivElement>(null);
+
+  // Upload state
   const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "done">("idle");
   const [progress, setProgress] = useState(0);
   const [testReportStage, setTestReportStage] = useState<"idle" | "generating" | "done" | "fading" | "appearing">("idle");
-  const chatRef = useRef<HTMLDivElement>(null);
-  const textChatRef = useRef<HTMLDivElement>(null);
 
-  // Voice playback
-  useEffect(() => {
-    if (mode !== "voice" || (!speaking && !listening) || idx >= CONVERSATION.length) {
-      if (idx >= CONVERSATION.length && mode === "voice") setDone(true);
-      return;
-    }
-    const msg = CONVERSATION[idx];
-    const t = setTimeout(() => {
-      setMsgs((p) => [...p, msg]);
-      setSpeaking(false);
-      setListening(false);
-      setIdx((i) => i + 1);
-    }, msg.role === "ai" ? 900 : 1100);
-    return () => clearTimeout(t);
-  }, [idx, speaking, listening, mode]);
+  // ElevenLabs conversation hook
+  const conversation = useConversation({
+    onMessage: (props) => {
+      setTranscript((prev) => [
+        ...prev,
+        { role: props.role === "user" ? "user" : "agent", text: props.message },
+      ]);
+    },
+    onConnect: () => {
+      setError(null);
+    },
+    onDisconnect: () => {
+      // Conversation ended — transcript is already collected
+    },
+    onError: (message) => {
+      setError(message);
+    },
+  });
 
-  useEffect(() => {
-    if (idx > 0 && idx < CONVERSATION.length && mode === "voice" && !speaking && !listening) {
-      const msg = CONVERSATION[idx];
-      if (msg.role === "ai") setSpeaking(true);
-      else setListening(true);
-    }
-  }, [idx, mode, speaking, listening]);
-
+  // Auto-scroll transcript
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [msgs]);
+  }, [transcript]);
 
   useEffect(() => {
     if (textChatRef.current) textChatRef.current.scrollTop = textChatRef.current.scrollHeight;
@@ -89,10 +92,61 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
     }
   }, [uploadStage]);
 
-  const startVoice = () => {
+  // Start voice check-in: fetch signed URL from backend, then start ElevenLabs session
+  const startVoice = useCallback(async () => {
     setMode("voice");
-    setSpeaking(true);
-  };
+    setTranscript([]);
+    setError(null);
+    setSaved(false);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/voice/signed-url`, {
+        headers: { "x-user-id": "dev-user" },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to get signed URL (${res.status})`);
+      }
+      const { signed_url } = await res.json();
+      await conversation.startSession({ signedUrl: signed_url });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }, [conversation]);
+
+  // End the voice session
+  const endVoice = useCallback(async () => {
+    await conversation.endSession();
+  }, [conversation]);
+
+  // Save check-in to backend
+  const saveCheckin = useCallback(async () => {
+    if (transcript.length === 0) return;
+    setSaving(true);
+    try {
+      const fullTranscript = transcript
+        .map((m) => `${m.role === "user" ? "User" : "Agent"}: ${m.text}`)
+        .join("\n");
+
+      await fetch(`${BACKEND_URL}/api/checkins`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": "dev-user",
+        },
+        body: JSON.stringify({
+          input_mode: "voice",
+          transcript: fullTranscript,
+          notes: transcript.filter((m) => m.role === "user").map((m) => m.text).join(". "),
+        }),
+      });
+      setSaved(true);
+    } catch {
+      setError("Failed to save check-in");
+    } finally {
+      setSaving(false);
+    }
+  }, [transcript]);
 
   const sendChat = () => {
     if (!chatText.trim()) return;
@@ -105,6 +159,11 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
       ]);
     }, 1000);
   };
+
+  const isConnected = conversation.status === "connected";
+  const isConnecting = conversation.status === "connecting";
+  const isDisconnected = conversation.status === "disconnected";
+  const isDone = isDisconnected && transcript.length > 0;
 
   // ── Picker ──
   if (!mode) {
@@ -155,32 +214,43 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
     );
   }
 
-  // ── Voice mode ──
+  // ── Voice mode (ElevenLabs) ──
   if (mode === "voice") {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
         <div className="flex items-center justify-between px-5 py-4">
           <span className="text-[13px] font-medium tracking-wide text-zinc-400">Voice Check-in</span>
-          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600">
-            {done ? "Done ✓" : "Cancel"}
+          <button
+            onClick={async () => {
+              if (isConnected) await endVoice();
+              onClose();
+            }}
+            className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+          >
+            {isDone ? "Close" : isConnected ? "End" : "Cancel"}
           </button>
         </div>
 
+        {/* Status orb */}
         <div className="flex flex-col items-center px-0 pt-6 pb-3">
           <div
             className={`flex h-[72px] w-[72px] items-center justify-center rounded-full transition-all duration-500 ${
-              done
+              isDone || saved
                 ? "bg-emerald-50"
-                : listening
-                  ? "bg-zinc-900 shadow-[0_0_0_18px_rgba(0,0,0,0.03)]"
-                  : speaking
+                : isConnecting
+                  ? "bg-zinc-200 animate-pulse"
+                  : conversation.isSpeaking
                     ? "bg-violet-50 shadow-[0_0_0_18px_rgba(0,0,0,0.03)]"
-                    : "bg-zinc-900"
+                    : isConnected
+                      ? "bg-zinc-900 shadow-[0_0_0_18px_rgba(0,0,0,0.03)]"
+                      : "bg-zinc-200"
             }`}
           >
-            {done ? (
+            {isDone || saved ? (
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
-            ) : listening || speaking ? (
+            ) : isConnecting ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-400 border-t-zinc-700" />
+            ) : isConnected ? (
               <div className="flex h-[22px] items-center gap-[3px]">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div
@@ -188,7 +258,7 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
                     className="w-[2.5px] rounded-sm"
                     style={{
                       height: 22,
-                      background: listening ? "rgba(255,255,255,0.6)" : "#8b5cf6",
+                      background: conversation.isSpeaking ? "#8b5cf6" : "rgba(255,255,255,0.6)",
                       animation: `waveBar ${0.4 + i * 0.1}s ease-in-out infinite`,
                       animationDelay: `${i * 0.08}s`,
                     }}
@@ -196,16 +266,42 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="1.8" strokeLinecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
             )}
           </div>
           <div className="mt-2.5 min-h-[16px] text-xs font-medium text-zinc-400">
-            {listening ? "Listening…" : speaking ? "Speaking…" : done ? "Complete" : "Starting…"}
+            {saved
+              ? "Saved"
+              : isDone
+                ? "Complete"
+                : isConnecting
+                  ? "Connecting…"
+                  : conversation.isSpeaking
+                    ? "Kira is speaking…"
+                    : isConnected
+                      ? "Listening…"
+                      : error
+                        ? ""
+                        : "Starting…"}
           </div>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="mx-5 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+            {error}
+            <button
+              onClick={startVoice}
+              className="ml-2 font-medium underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Live transcript */}
         <div ref={chatRef} className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-5">
-          {msgs.map((m, i) => (
+          {transcript.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`} style={{ animation: "fadeUp 0.25s ease" }}>
               <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed ${
                 m.role === "user"
@@ -216,15 +312,15 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
               </div>
             </div>
           ))}
-          {(speaking || listening) && (
-            <div className={`flex ${listening ? "justify-end" : "justify-start"}`}>
-              <div className={`flex gap-1.5 rounded-2xl px-4 py-3 ${listening ? "bg-zinc-900" : "border border-zinc-100 bg-white"}`}>
+          {isConnected && (
+            <div className={`flex ${conversation.isSpeaking ? "justify-start" : "justify-end"}`}>
+              <div className={`flex gap-1.5 rounded-2xl px-4 py-3 ${conversation.isSpeaking ? "border border-zinc-100 bg-white" : "bg-zinc-900"}`}>
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
                     className="h-1.5 w-1.5 rounded-full"
                     style={{
-                      background: listening ? "rgba(255,255,255,0.4)" : "#d4d4d8",
+                      background: conversation.isSpeaking ? "#d4d4d8" : "rgba(255,255,255,0.4)",
                       animation: `bounce 1.2s ${i * 0.15}s infinite`,
                     }}
                   />
@@ -233,6 +329,63 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
+
+        {/* Bottom action bar */}
+        {isConnected && (
+          <div className="flex justify-center border-t border-zinc-100 bg-white/90 px-5 py-4 backdrop-blur-lg">
+            <button
+              onClick={endVoice}
+              className="flex items-center gap-2 rounded-2xl bg-red-50 px-6 py-3 text-[13px] font-medium text-red-600 transition-all hover:bg-red-100 active:scale-[0.98]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 004.73.89 2 2 0 012 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91" />
+                <line x1="23" y1="1" x2="1" y2="23" />
+              </svg>
+              End check-in
+            </button>
+          </div>
+        )}
+
+        {/* Save check-in after conversation ends */}
+        {isDone && !saved && (
+          <div className="flex gap-2.5 border-t border-zinc-100 bg-white/90 px-5 py-4 backdrop-blur-lg">
+            <button
+              onClick={saveCheckin}
+              disabled={saving}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-zinc-900 py-3 text-[13px] font-medium text-white transition-all hover:bg-zinc-700 active:scale-[0.98] disabled:opacity-60"
+            >
+              {saving ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  Save check-in
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-200 py-3 text-[13px] font-medium text-zinc-600 transition-all hover:bg-zinc-50 active:scale-[0.98]"
+            >
+              Discard
+            </button>
+          </div>
+        )}
+
+        {saved && (
+          <div className="flex justify-center border-t border-zinc-100 bg-white/90 px-5 py-4 backdrop-blur-lg">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-6 py-3 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-100 active:scale-[0.98]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Done
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -397,7 +550,6 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-
     </div>
   );
 }

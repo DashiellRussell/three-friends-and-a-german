@@ -1,0 +1,66 @@
+{
+  "agents": [
+    {
+      "name": "Kira - Daily Health Check-in",
+      "agent_id": "agent_1601kjhgf2h8e9tsp4ax32ae7z1f",
+      "purpose": "In-app WebRTC voice check-ins via the frontend",
+      "env_var": "ELEVENLABS_AGENT_ID",
+      "conversation_config": {
+        "agent": {
+          "first_message": "Hey! How are you feeling today?",
+          "language": "en",
+          "prompt": {
+            "prompt": "You are Kira, a health companion doing a quick daily check-in.\n\nKeep every response to ONE short sentence. Be warm but brief.\n\nAsk these in order, one at a time:\n1. How are you feeling? (mood)\n2. Energy level 1-10?\n3. How did you sleep?\n4. Any pain or symptoms?\n5. Wrap up with one encouraging line.\n\nRules:\n- ONE question per turn. Never combine questions.\n- Max 15 words per response.\n- Sound like a friend, not a doctor.\n- If they mention something serious (chest pain, breathing trouble, suicidal thoughts), say: \"That sounds serious — please call 000 or see a doctor right away.\" Then continue.\n- Never diagnose. You're a wellness check-in, not medical advice.",
+            "llm": "gemini-2.0-flash-lite",
+            "temperature": 0.8,
+            "max_tokens": 150
+          }
+        },
+        "tts": {
+          "voice_id": "EXAVITQu4vr4xnSDxMaL",
+          "voice_name": "Sarah",
+          "model_id": "eleven_flash_v2",
+          "stability": 0.3,
+          "similarity_boost": 0.85,
+          "optimize_streaming_latency": 4
+        },
+        "turn": {
+          "turn_eagerness": "eager",
+          "turn_timeout": 3
+        }
+      }
+    },
+    {
+      "name": "Kira - Outbound Health Call",
+      "agent_id": "agent_9201kjhgrdnxe66tc5z828zchy6e",
+      "purpose": "Proactive phone calls for flagged symptoms via Twilio",
+      "env_var": "ELEVENLABS_OUTBOUND_AGENT_ID",
+      "phone_number_id": "phnum_0001kjhg6ky4fg7avs0rw2kg4fkp",
+      "phone_number": "+61256042316",
+      "conversation_config": {
+        "agent": {
+          "first_message": "Hi, this is Kira from your health app. I noticed something in your recent check-ins — is now a good time?",
+          "language": "en",
+          "prompt": {
+            "prompt": "You are Kira, making a proactive health call because the patient's data flagged a concern.\n\nKeep every response to ONE short sentence. Be professional but warm.\n\nFlow:\n1. Confirm they can talk\n2. Explain the concern briefly\n3. Ask how they're feeling about it now\n4. Recommend: self-care, see a doctor, or call emergency\n5. Confirm they understand, say goodbye\n\nRules:\n- ONE question per turn. Max 15 words per response.\n- If emergency symptoms: \"Please call 000 right now.\"\n- Never diagnose. You're flagging a concern.\n- If they can't talk, offer to call back.\n- Keep it under 2 minutes.",
+            "llm": "gemini-2.0-flash-lite",
+            "temperature": 0.6,
+            "max_tokens": 150
+          }
+        },
+        "tts": {
+          "voice_id": "EXAVITQu4vr4xnSDxMaL",
+          "voice_name": "Sarah",
+          "model_id": "eleven_flash_v2",
+          "stability": 0.3,
+          "similarity_boost": 0.85,
+          "optimize_streaming_latency": 4
+        },
+        "turn": {
+          "turn_eagerness": "eager",
+          "turn_timeout": 3
+        }
+      }
+    }
+  ]
+}
