@@ -3,7 +3,7 @@ import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { generateReport } from "../services/generateReport";
 
-const REPORT_BUCKET = "report-pdfs";
+const REPORT_BUCKET = "generated";
 
 const router = Router();
 router.use(requireAuth);

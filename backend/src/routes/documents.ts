@@ -4,7 +4,7 @@ import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
 
-const DOCUMENT_BUCKET = "medical-documents";
+const DOCUMENT_BUCKET = "uploads";
 
 const router = Router();
 router.use(requireAuth);
