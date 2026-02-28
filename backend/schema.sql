@@ -15,6 +15,7 @@ create table profiles (
   email         text unique not null,
   display_name  text,
   date_of_birth date,
+  gender        text,
   blood_type    text,
   conditions    text[] default '{}',
   allergies     text[] default '{}',
@@ -155,8 +156,7 @@ create table reports (
   date_to         date not null,
   detail_level    text check (detail_level in ('brief', 'summary', 'detailed')),
   include_sections jsonb,   -- {symptoms: true, documents: true, trends: true, ...}
-  content_json    jsonb,
-  pdf_url         text,
+  content_path    text,
   status          text default 'pending' check (status in ('pending', 'generating', 'completed', 'failed')),
   created_at      timestamptz default now()
 );
