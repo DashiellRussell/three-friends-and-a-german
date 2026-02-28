@@ -4,21 +4,29 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useConversation } from "@elevenlabs/react";
 import { LAB_RESULTS, statusVariant } from "@/lib/mock-data";
 import { generateTestReport } from "@/lib/generate-test-report";
-import { Pill } from "./shared";
+import { useUser } from "@/lib/user-context";
+import { Pill, useToast } from "./shared";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const DEV_USER_ID = "10fef350-acb9-48e8-aa79-fef974a40e5b";
 
-type Mode = null | "voice" | "chat" | "upload";
+type Mode = null | "voice" | "chat" | "upload" | "calling";
 type TranscriptMsg = { role: "user" | "agent"; text: string };
 
 export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => void; startInVoiceMode?: boolean }) {
+  const { user } = useUser();
+  const userId = user?.id || "";
   const [mode, setMode] = useState<Mode>(null);
   const [transcript, setTranscript] = useState<TranscriptMsg[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [autoEnding, setAutoEnding] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
+
+  // Calling state
+  const [callStatus, setCallStatus] = useState<"idle" | "initiating" | "ringing" | "done" | "error">("idle");
+  const [callError, setCallError] = useState<string | null>(null);
+  const { show: showToast, ToastEl } = useToast();
 
   // Text chat state
   const [chatText, setChatText] = useState("");
@@ -32,6 +40,9 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
   const [progress, setProgress] = useState(0);
   const [testReportStage, setTestReportStage] = useState<"idle" | "generating" | "done" | "fading" | "appearing">("idle");
 
+  // Track whether agent triggered auto-end
+  const autoEndRef = useRef(false);
+
   // ElevenLabs conversation hook
   const conversation = useConversation({
     onMessage: (props) => {
@@ -44,7 +55,10 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
       setError(null);
     },
     onDisconnect: () => {
-      // Conversation ended — transcript is already collected
+      // If agent triggered auto-end, auto-save
+      if (autoEndRef.current) {
+        setAutoEnding(true);
+      }
     },
     onError: (message) => {
       setError(message);
@@ -60,16 +74,25 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/voice/signed-url`, {
-        headers: { "x-user-id": DEV_USER_ID },
+        headers: { "x-user-id": userId },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Failed to get signed URL (${res.status})`);
       }
       const { signed_url, dynamic_variables } = await res.json();
+      autoEndRef.current = false;
       await conversation.startSession({
         signedUrl: signed_url,
         dynamicVariables: dynamic_variables,
+        clientTools: {
+          end_conversation: async () => {
+            // Agent signals it has collected all needed info
+            autoEndRef.current = true;
+            await conversation.endSession();
+            return "Conversation ended.";
+          },
+        },
       });
     } catch (err) {
       setError((err as Error).message);
@@ -94,7 +117,7 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": DEV_USER_ID,
+          "x-user-id": userId,
         },
         body: JSON.stringify({
           input_mode: "voice",
@@ -103,12 +126,72 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
         }),
       });
       setSaved(true);
+      showToast("Check-in saved", "success", "Your daily check-in has been recorded");
     } catch {
       setError("Failed to save check-in");
+      showToast("Failed to save check-in", "error");
     } finally {
       setSaving(false);
     }
   }, [transcript]);
+
+  // Auto-save when agent triggers end_conversation
+  useEffect(() => {
+    if (autoEnding && transcript.length > 0 && !saving && !saved) {
+      saveCheckin();
+    }
+  }, [autoEnding, transcript, saving, saved, saveCheckin]);
+
+  // Initiate outbound call (Kira calls user's phone)
+  const startCall = useCallback(async () => {
+    setMode("calling");
+    setCallStatus("initiating");
+    setCallError(null);
+
+    try {
+      // Fetch user profile to get phone number
+      const profileRes = await fetch(`${BACKEND_URL}/api/profiles`, {
+        headers: { "x-user-id": userId },
+      });
+      if (!profileRes.ok) throw new Error("Failed to fetch profile");
+      const profile = await profileRes.json();
+
+      if (!profile.phone_number) {
+        throw new Error("No phone number on profile. Add one in Settings first.");
+      }
+
+      const res = await fetch(`${BACKEND_URL}/api/voice/outbound-call`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({
+          phone_number: profile.phone_number,
+          dynamic_variables: {
+            user_name: profile.display_name || "there",
+            conditions: profile.conditions?.join(", ") || "none listed",
+            allergies: profile.allergies?.join(", ") || "none listed",
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Call failed (${res.status})`);
+      }
+
+      setCallStatus("ringing");
+      showToast("Kira is calling you now", "success", "Pick up your phone to start the check-in");
+      // Auto-transition to done after a delay (call is now in ElevenLabs+Twilio hands)
+      setTimeout(() => setCallStatus("done"), 3000);
+    } catch (err) {
+      const msg = (err as Error).message;
+      setCallError(msg);
+      setCallStatus("error");
+      showToast(msg, "error");
+    }
+  }, [userId, showToast]);
 
   // Auto-start voice if requested
   const hasAutoStarted = useRef(false);
@@ -182,6 +265,7 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
   if (!mode) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+        {ToastEl}
         <div onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-sm" />
         <div className="rounded-t-3xl bg-white px-6 pb-10 pt-5" style={{ animation: "slideUp 0.3s ease" }}>
           <div className="mx-auto mb-6 h-1 w-8 rounded-full bg-zinc-200" />
@@ -197,6 +281,17 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
               <div>
                 <div className="text-[15px] font-semibold text-white">Voice check-in</div>
                 <div className="mt-0.5 text-xs text-white/50">~2 min conversation · recommended</div>
+              </div>
+            </button>
+
+            {/* Call me */}
+            <button onClick={startCall} className="flex w-full items-center gap-4 rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+              </div>
+              <div>
+                <div className="text-[15px] font-semibold text-zinc-900">Call me</div>
+                <div className="mt-0.5 text-xs text-zinc-400">Kira calls your phone · hands-free</div>
               </div>
             </button>
 
@@ -231,6 +326,7 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
   if (mode === "voice") {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
+        {ToastEl}
         <div className="flex items-center justify-between px-5 py-4">
           <span className="text-[13px] font-medium tracking-wide text-zinc-400">Voice Check-in</span>
           <button
@@ -285,17 +381,19 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
           <div className="mt-2.5 min-h-[16px] text-xs font-medium text-zinc-400">
             {saved
               ? "Saved"
-              : isDone
-                ? "Complete"
-                : isConnecting
-                  ? "Connecting…"
-                  : conversation.isSpeaking
-                    ? "Kira is speaking…"
-                    : isConnected
-                      ? "Listening…"
-                      : error
-                        ? ""
-                        : "Starting…"}
+              : autoEnding && saving
+                ? "Auto-saving…"
+                : isDone
+                  ? "Complete"
+                  : isConnecting
+                    ? "Connecting…"
+                    : conversation.isSpeaking
+                      ? "Kira is speaking…"
+                      : isConnected
+                        ? "Listening…"
+                        : error
+                          ? ""
+                          : "Starting…"}
           </div>
         </div>
 
@@ -403,10 +501,84 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
     );
   }
 
+  // ── Calling mode (outbound phone call) ──
+  if (mode === "calling") {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
+        {ToastEl}
+        <div className="flex items-center justify-between px-5 py-4">
+          <span className="text-[13px] font-medium tracking-wide text-zinc-400">Calling You</span>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+          >
+            {callStatus === "done" ? "Close" : "Cancel"}
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col items-center justify-center px-5">
+          {/* Status orb */}
+          <div
+            className={`mb-6 flex h-[88px] w-[88px] items-center justify-center rounded-full transition-all duration-500 ${
+              callStatus === "done"
+                ? "bg-emerald-50"
+                : callStatus === "error"
+                  ? "bg-red-50"
+                  : callStatus === "ringing"
+                    ? "bg-emerald-50 shadow-[0_0_0_18px_rgba(16,185,129,0.08)]"
+                    : "bg-zinc-200 animate-pulse"
+            }`}
+          >
+            {callStatus === "done" ? (
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+            ) : callStatus === "error" ? (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            ) : callStatus === "ringing" ? (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" style={{ animation: "pulse 1.5s ease-in-out infinite" }}>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+            ) : (
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-400 border-t-zinc-700" />
+            )}
+          </div>
+
+          <div className="text-[17px] font-semibold text-zinc-900">
+            {callStatus === "done"
+              ? "Call initiated"
+              : callStatus === "error"
+                ? "Call failed"
+                : callStatus === "ringing"
+                  ? "Ringing..."
+                  : "Setting up call..."}
+          </div>
+          <div className="mt-2 max-w-[260px] text-center text-[13px] text-zinc-400">
+            {callStatus === "done"
+              ? "Kira is calling your phone now. Answer to start your check-in — your transcript will be saved automatically."
+              : callStatus === "error"
+                ? callError
+                : callStatus === "ringing"
+                  ? "Kira is calling your phone. Pick up to start your check-in."
+                  : "Connecting to Kira..."}
+          </div>
+
+          {callStatus === "error" && (
+            <button
+              onClick={startCall}
+              className="mt-5 rounded-2xl bg-zinc-900 px-6 py-3 text-[13px] font-medium text-white transition-all hover:bg-zinc-700 active:scale-[0.98]"
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Chat mode ──
   if (mode === "chat") {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
+        {ToastEl}
         <div className="flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2.5">
             <button onClick={() => setMode(null)} className="text-zinc-400 transition-colors hover:text-zinc-600">
@@ -455,6 +627,7 @@ export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => voi
   // ── Upload mode ──
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#fafafa]">
+      {ToastEl}
       <div className="flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2.5">
           <button onClick={() => setMode(null)} className="text-zinc-400 transition-colors hover:text-zinc-600">

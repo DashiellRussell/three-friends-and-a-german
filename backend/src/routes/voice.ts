@@ -1,10 +1,162 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../services/supabase";
-import { getSignedUrl, initiateOutboundCall } from "../services/elevenlabs";
+import {
+  getSignedUrl,
+  initiateOutboundCall,
+  getConversationDetails,
+} from "../services/elevenlabs";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
+
+// POST /api/voice/webhook/call-complete — ElevenLabs webhook when outbound call ends
+// No auth required — called by ElevenLabs servers
+router.post("/webhook/call-complete", async (req: Request, res: Response) => {
+  const { conversation_id, transcript, status, duration_seconds } = req.body;
+
+  if (!conversation_id) {
+    res.status(400).json({ error: "conversation_id is required" });
+    return;
+  }
+
+  try {
+    // Find the outbound call record
+    const { data: call, error: findErr } = await supabase
+      .from("outbound_calls")
+      .select("id, user_id")
+      .eq("elevenlabs_conversation_id", conversation_id)
+      .single();
+
+    if (findErr || !call) {
+      res.status(404).json({ error: "Call not found" });
+      return;
+    }
+
+    // Update the call record
+    const updates: Record<string, unknown> = {
+      status: status || "completed",
+    };
+    if (transcript) updates.transcript = transcript;
+    if (duration_seconds) updates.duration_seconds = duration_seconds;
+
+    await supabase
+      .from("outbound_calls")
+      .update(updates)
+      .eq("id", call.id);
+
+    // Auto-create a check-in from the call transcript
+    if (transcript) {
+      await supabase.from("check_ins").insert({
+        user_id: call.user_id,
+        input_mode: "voice",
+        transcript: transcript,
+        notes: `Outbound call check-in (auto-saved)`,
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 router.use(requireAuth);
+
+// POST /api/voice/sync-calls — fetch conversation details from ElevenLabs and update DB
+router.post("/sync-calls", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  try {
+    // Find all calls that haven't been completed yet
+    const { data: calls, error: fetchErr } = await supabase
+      .from("outbound_calls")
+      .select("id, elevenlabs_conversation_id, status")
+      .eq("user_id", userId)
+      .in("status", ["initiated", "in-progress"]);
+
+    if (fetchErr) {
+      res.status(500).json({ error: fetchErr.message });
+      return;
+    }
+
+    if (!calls || calls.length === 0) {
+      res.json({ synced: 0, calls: [] });
+      return;
+    }
+
+    const results = [];
+
+    for (const call of calls) {
+      try {
+        const details = await getConversationDetails(
+          call.elevenlabs_conversation_id,
+        );
+
+        // Build the transcript string from the conversation turns
+        let transcriptText: string | null = null;
+        if (details.transcript && typeof details.transcript === "string") {
+          transcriptText = details.transcript;
+        } else if (
+          details.transcript &&
+          Array.isArray(details.transcript)
+        ) {
+          // ElevenLabs returns transcript as array of turns
+          transcriptText = (
+            details.transcript as unknown as Array<{
+              role: string;
+              message: string;
+            }>
+          )
+            .map(
+              (turn) =>
+                `${turn.role === "agent" ? "Agent" : "User"}: ${turn.message}`,
+            )
+            .join("\n");
+        }
+
+        const updates: Record<string, unknown> = {
+          status:
+            details.status === "done" ? "completed" : details.status,
+        };
+        if (transcriptText) updates.transcript = transcriptText;
+        if (details.call_duration_secs)
+          updates.duration_seconds = details.call_duration_secs;
+        if (details.analysis) {
+          updates.outcome = JSON.stringify(details.analysis);
+        }
+
+        const { data: updated } = await supabase
+          .from("outbound_calls")
+          .update(updates)
+          .eq("id", call.id)
+          .select()
+          .single();
+
+        // Auto-create a check-in from the call transcript
+        if (transcriptText && updates.status === "completed") {
+          await supabase.from("check_ins").insert({
+            user_id: userId,
+            input_mode: "voice",
+            transcript: transcriptText,
+            notes: `Outbound call check-in (auto-saved)`,
+          });
+        }
+
+        results.push({ id: call.id, status: updates.status, updated: true });
+      } catch (err) {
+        results.push({
+          id: call.id,
+          error: (err as Error).message,
+          updated: false,
+        });
+      }
+    }
+
+    res.json({ synced: results.filter((r) => r.updated).length, calls: results });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 // GET /api/voice/signed-url — get ElevenLabs signed URL for WebRTC voice session
 router.get("/signed-url", async (req: Request, res: Response) => {

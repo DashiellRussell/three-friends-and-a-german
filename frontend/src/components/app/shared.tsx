@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 
 const PILL_STYLES = {
   default: "bg-zinc-100 text-zinc-500",
@@ -114,6 +114,83 @@ export function SegmentedControl({
       ))}
     </div>
   );
+}
+
+// ── Toast notification ──
+
+type ToastVariant = "success" | "error" | "info";
+
+const TOAST_ICONS: Record<ToastVariant, ReactNode> = {
+  success: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+  ),
+  error: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+  ),
+  info: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+  ),
+};
+
+const TOAST_STYLES: Record<ToastVariant, string> = {
+  success: "border-emerald-200 bg-emerald-50",
+  error: "border-red-200 bg-red-50",
+  info: "border-blue-200 bg-blue-50",
+};
+
+const TOAST_TEXT: Record<ToastVariant, string> = {
+  success: "text-emerald-800",
+  error: "text-red-800",
+  info: "text-blue-800",
+};
+
+export function Toast({
+  message,
+  subtitle,
+  variant = "success",
+  visible,
+}: {
+  message: string;
+  subtitle?: string;
+  variant?: ToastVariant;
+  visible: boolean;
+}) {
+  return (
+    <div
+      className={`pointer-events-none fixed left-1/2 top-5 z-[200] -translate-x-1/2 transition-all duration-300 ${
+        visible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
+      }`}
+    >
+      <div className={`flex items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg shadow-black/5 backdrop-blur-lg ${TOAST_STYLES[variant]}`}>
+        <div className="shrink-0">{TOAST_ICONS[variant]}</div>
+        <div>
+          <div className={`text-[13px] font-semibold ${TOAST_TEXT[variant]}`}>{message}</div>
+          {subtitle && <div className={`mt-0.5 text-[11px] ${TOAST_TEXT[variant]} opacity-60`}>{subtitle}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function useToast(duration = 3500) {
+  const [toast, setToast] = useState<{ message: string; subtitle?: string; variant: ToastVariant } | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!toast) return;
+    setVisible(true);
+    const hide = setTimeout(() => setVisible(false), duration);
+    const clear = setTimeout(() => setToast(null), duration + 350);
+    return () => { clearTimeout(hide); clearTimeout(clear); };
+  }, [toast, duration]);
+
+  const show = useCallback((message: string, variant: ToastVariant = "success", subtitle?: string) => {
+    setToast({ message, subtitle, variant });
+  }, []);
+
+  const ToastEl = toast ? <Toast message={toast.message} subtitle={toast.subtitle} variant={toast.variant} visible={visible} /> : null;
+
+  return { show, ToastEl };
 }
 
 export function Sparkline({

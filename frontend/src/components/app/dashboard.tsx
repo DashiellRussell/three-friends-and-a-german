@@ -1,20 +1,38 @@
 "use client";
 
 import { CHECKINS } from "@/lib/mock-data";
+import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void; onStartVoice?: () => void }) {
+  const { user } = useUser();
   const last7 = CHECKINS.slice(0, 7).reverse();
+  const firstName = user?.display_name?.split(" ")[0] || "there";
 
   return (
     <div className="px-5 pt-8 pb-[100px]">
       {/* Greeting */}
       <div className="mb-8">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-          February 28, 2026
+          {formatDate()}
         </p>
         <h1 className="mt-1.5 text-[28px] font-semibold tracking-tight text-zinc-900 leading-tight">
-          Good morning
+          {getGreeting()}, {firstName}
         </h1>
       </div>
 

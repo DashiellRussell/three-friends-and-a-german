@@ -3,6 +3,51 @@ import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
+
+// POST /api/profiles/login — simple email login (no auth required)
+// Finds profile by email or creates a new one
+router.post("/login", async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string") {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Try to find existing profile
+  const { data: existing, error: findError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", normalizedEmail)
+    .single();
+
+  if (existing) {
+    res.json(existing);
+    return;
+  }
+
+  // Not found — create a new profile
+  if (findError && findError.code !== "PGRST116") {
+    res.status(500).json({ error: findError.message });
+    return;
+  }
+
+  const displayName = normalizedEmail.split("@")[0];
+  const { data: created, error: createError } = await supabase
+    .from("profiles")
+    .insert({ email: normalizedEmail, display_name: displayName })
+    .select()
+    .single();
+
+  if (createError) {
+    res.status(500).json({ error: createError.message });
+    return;
+  }
+
+  res.status(201).json(created);
+});
+
 router.use(requireAuth);
 
 // GET /api/profiles — get own profile

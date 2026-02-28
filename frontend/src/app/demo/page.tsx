@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UserProvider, useUser } from "@/lib/user-context";
 import { Dashboard } from "@/components/app/dashboard";
 import { Log } from "@/components/app/log";
 import { Trends } from "@/components/app/trends";
@@ -33,10 +34,84 @@ const NAV_ITEMS: { id: Tab | "input"; label: string; d: string }[] = [
   },
 ];
 
-export default function DemoPage() {
+function LoginScreen() {
+  const { login } = useUser();
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setError("");
+    setLoading(true);
+    try {
+      await login(email.trim());
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex h-dvh flex-col items-center justify-center bg-[#fafafa] px-8">
+      <div className="mb-10 flex flex-col items-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          </svg>
+        </div>
+        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">Kira</h1>
+        <p className="mt-1 text-[14px] text-zinc-400">Your AI health companion</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="w-full max-w-[320px]">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your email"
+          autoFocus
+          className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 text-[15px] text-zinc-900 placeholder:text-zinc-300 outline-none transition-colors focus:border-zinc-400"
+        />
+        {error && (
+          <p className="mt-2 text-[13px] text-red-500">{error}</p>
+        )}
+        <button
+          type="submit"
+          disabled={loading || !email.trim()}
+          className="mt-3 w-full rounded-2xl bg-zinc-900 py-3.5 text-[15px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-40"
+        >
+          {loading ? "Signing in..." : "Continue"}
+        </button>
+      </form>
+
+      <p className="mt-6 text-center text-[12px] text-zinc-300">
+        We&apos;ll create an account if you&apos;re new
+      </p>
+    </div>
+  );
+}
+
+function DemoApp() {
+  const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-[#fafafa]">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-600" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-[#fafafa] font-sans">
@@ -99,5 +174,13 @@ export default function DemoPage() {
       {/* Input overlay */}
       {inputOpen && <InputOverlay onClose={() => { setInputOpen(false); setVoiceMode(false); }} startInVoiceMode={voiceMode} />}
     </div>
+  );
+}
+
+export default function DemoPage() {
+  return (
+    <UserProvider>
+      <DemoApp />
+    </UserProvider>
   );
 }
