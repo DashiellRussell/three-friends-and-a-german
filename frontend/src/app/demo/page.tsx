@@ -37,6 +37,7 @@ const NAV_ITEMS: { id: Tab | "input"; label: string; d: string }[] = [
 export default function DemoPage() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [inputOpen, setInputOpen] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
 
   return (
     <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-[#fafafa] font-sans">
@@ -60,7 +61,7 @@ export default function DemoPage() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => setInputOpen(true)} />}
+        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => { setVoiceMode(true); setInputOpen(true); }} />}
         {tab === "log" && <Log />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
@@ -100,7 +101,7 @@ export default function DemoPage() {
       </div>
 
       {/* Input overlay */}
-      {inputOpen && <InputOverlay onClose={() => setInputOpen(false)} />}
+      {inputOpen && <InputOverlay onClose={() => { setInputOpen(false); setVoiceMode(false); }} startInVoiceMode={voiceMode} />}
     </div>
   );
 }

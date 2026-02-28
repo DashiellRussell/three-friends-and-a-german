@@ -12,7 +12,7 @@ const DEV_USER_ID = "10fef350-acb9-48e8-aa79-fef974a40e5b";
 type Mode = null | "voice" | "chat" | "upload";
 type TranscriptMsg = { role: "user" | "agent"; text: string };
 
-export function InputOverlay({ onClose }: { onClose: () => void }) {
+export function InputOverlay({ onClose, startInVoiceMode }: { onClose: () => void; startInVoiceMode?: boolean }) {
   const [mode, setMode] = useState<Mode>(null);
   const [transcript, setTranscript] = useState<TranscriptMsg[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -50,48 +50,6 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
       setError(message);
     },
   });
-
-  // Auto-scroll transcript
-  useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [transcript]);
-
-  useEffect(() => {
-    if (textChatRef.current) textChatRef.current.scrollTop = textChatRef.current.scrollHeight;
-  }, [chatMsgs]);
-
-  // Generate test report
-  useEffect(() => {
-    if (testReportStage === "generating") {
-      const t = setTimeout(() => setTestReportStage("done"), 2000);
-      return () => clearTimeout(t);
-    }
-    if (testReportStage === "fading") {
-      const t = setTimeout(() => setTestReportStage("appearing"), 320);
-      return () => clearTimeout(t);
-    }
-  }, [testReportStage]);
-
-  // Upload progress
-  useEffect(() => {
-    if (uploadStage === "uploading") {
-      const iv = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 100) {
-            clearInterval(iv);
-            setUploadStage("processing");
-            return 100;
-          }
-          return p + 10;
-        });
-      }, 70);
-      return () => clearInterval(iv);
-    }
-    if (uploadStage === "processing") {
-      const t = setTimeout(() => setUploadStage("done"), 1600);
-      return () => clearTimeout(t);
-    }
-  }, [uploadStage]);
 
   // Start voice check-in: fetch signed URL from backend, then start ElevenLabs session
   const startVoice = useCallback(async () => {
@@ -151,6 +109,57 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
       setSaving(false);
     }
   }, [transcript]);
+
+  // Auto-start voice if requested
+  const hasAutoStarted = useRef(false);
+  useEffect(() => {
+    if (startInVoiceMode && !hasAutoStarted.current) {
+      hasAutoStarted.current = true;
+      startVoice();
+    }
+  }, [startInVoiceMode, startVoice]);
+
+  // Auto-scroll transcript
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [transcript]);
+
+  useEffect(() => {
+    if (textChatRef.current) textChatRef.current.scrollTop = textChatRef.current.scrollHeight;
+  }, [chatMsgs]);
+
+  // Generate test report
+  useEffect(() => {
+    if (testReportStage === "generating") {
+      const t = setTimeout(() => setTestReportStage("done"), 2000);
+      return () => clearTimeout(t);
+    }
+    if (testReportStage === "fading") {
+      const t = setTimeout(() => setTestReportStage("appearing"), 320);
+      return () => clearTimeout(t);
+    }
+  }, [testReportStage]);
+
+  // Upload progress
+  useEffect(() => {
+    if (uploadStage === "uploading") {
+      const iv = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 100) {
+            clearInterval(iv);
+            setUploadStage("processing");
+            return 100;
+          }
+          return p + 10;
+        });
+      }, 70);
+      return () => clearInterval(iv);
+    }
+    if (uploadStage === "processing") {
+      const t = setTimeout(() => setUploadStage("done"), 1600);
+      return () => clearTimeout(t);
+    }
+  }, [uploadStage]);
 
   const sendChat = () => {
     if (!chatText.trim()) return;
