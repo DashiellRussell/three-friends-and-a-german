@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { CONVERSATION, LAB_RESULTS, statusVariant } from "@/lib/mock-data";
+import { generateTestReport } from "@/lib/generate-test-report";
 import { Pill } from "./shared";
 
 type Mode = null | "voice" | "chat" | "upload";
@@ -19,6 +20,7 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
   ]);
   const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "done">("idle");
   const [progress, setProgress] = useState(0);
+  const [testReportStage, setTestReportStage] = useState<"idle" | "generating" | "done" | "fading" | "appearing">("idle");
   const chatRef = useRef<HTMLDivElement>(null);
   const textChatRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +55,18 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (textChatRef.current) textChatRef.current.scrollTop = textChatRef.current.scrollHeight;
   }, [chatMsgs]);
+
+  // Generate test report
+  useEffect(() => {
+    if (testReportStage === "generating") {
+      const t = setTimeout(() => setTestReportStage("done"), 2000);
+      return () => clearTimeout(t);
+    }
+    if (testReportStage === "fading") {
+      const t = setTimeout(() => setTestReportStage("appearing"), 320);
+      return () => clearTimeout(t);
+    }
+  }, [testReportStage]);
 
   // Upload progress
   useEffect(() => {
@@ -285,7 +299,7 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
         <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600">Close</button>
       </div>
 
-      <div className="flex-1 px-5">
+      <div className="flex flex-col gap-[5%] px-5">
         {uploadStage === "idle" && (
           <button
             onClick={() => setUploadStage("uploading")}
@@ -336,7 +350,54 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         )}
+
+        {uploadStage === "idle" && (testReportStage === "idle" || testReportStage === "appearing") && (
+          <button
+            onClick={() => setTestReportStage("generating")}
+            className="flex w-full flex-col items-center rounded-2xl border-2 border-dashed border-zinc-200 bg-white p-14 transition-all hover:border-zinc-300 hover:shadow-sm"
+            style={testReportStage === "appearing" ? { animation: "fadeUp 0.4s ease both" } : undefined}
+          >
+            <div className="text-sm font-medium text-zinc-900">Generate Test PDF</div>
+            <div className="mt-1 text-xs text-zinc-400">Blood tests, prescriptions, scans</div>
+          </button>
+        )}
+
+        {testReportStage === "generating" && (
+          <div className="flex flex-col items-center py-14" style={{ animation: "fadeUp 0.2s" }}>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-100 border-t-zinc-900" />
+            <div className="mt-4 text-xs text-zinc-400">Generating report…</div>
+          </div>
+        )}
+
+        {(testReportStage === "done" || testReportStage === "fading") && (
+          <div
+            className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-100 bg-white px-5 py-6"
+            style={{ animation: testReportStage === "fading" ? "fadeDown 0.32s forwards" : "fadeUp 0.3s" }}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+            </div>
+            <div className="text-[13px] font-medium text-zinc-900">Report generated</div>
+            <div className="text-[11px] text-zinc-400">Your test PDF is ready</div>
+            <div className="mt-1 flex w-full gap-2">
+              <button
+                onClick={() => generateTestReport()}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-700 active:scale-[0.98]"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                Download PDF
+              </button>
+              <button
+                onClick={() => setTestReportStage("fading")}
+                className="flex flex-1 items-center justify-center rounded-xl border border-zinc-200 py-2.5 text-[13px] font-medium text-zinc-600 transition-all hover:bg-zinc-50 active:scale-[0.98]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
     </div>
   );
 }
