@@ -1,15 +1,10 @@
 import { Router, Request, Response } from "express";
-import multer from "multer";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
+import { summarizeDocument, embedText } from "../services/mistral";
 
 const router = Router();
 router.use(requireAuth);
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-});
 
 // GET /api/documents — list user's documents
 router.get("/", async (req: Request, res: Response) => {
@@ -49,42 +44,33 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // POST /api/documents/upload — upload a medical document
-router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
+router.post("/upload", async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const file = req.file;
+  const { document_text, file_name, document_type } = req.body;
 
-  if (!file) {
-    res.status(400).json({ error: "No file provided" });
+  if (!document_text) {
+    res.status(400).json({ error: "document_text is required" });
     return;
   }
 
-  const fileName = `${userId}/${Date.now()}-${file.originalname}`;
+  const validTypes = ["lab_report", "prescription", "imaging", "discharge_summary", "other"];
+  const docType = validTypes.includes(document_type) ? document_type : "other";
 
-  // Upload to Supabase Storage
-  const { error: storageError } = await supabase.storage
-    .from("medical-documents")
-    .upload(fileName, file.buffer, {
-      contentType: file.mimetype,
-    });
+  const [summary, embedding] = await Promise.all([
+    summarizeDocument(document_text),
+    embedText(document_text),
+  ]);
 
-  if (storageError) {
-    res.status(500).json({ error: `Storage upload failed: ${storageError.message}` });
-    return;
-  }
-
-  const { data: urlData } = supabase.storage
-    .from("medical-documents")
-    .getPublicUrl(fileName);
-
-  // Create document record
   const { data: doc, error: dbError } = await supabase
     .from("documents")
     .insert({
       user_id: userId,
-      file_name: file.originalname,
-      file_url: urlData.publicUrl,
-      file_type: file.mimetype,
-      document_type: req.body.document_type || "other",
+      file_name: file_name ?? "document.pdf",
+      file_url: "",
+      file_type: "application/pdf",
+      document_type: docType,
+      summary,
+      embedding,
     })
     .select()
     .single();
@@ -93,12 +79,6 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     res.status(500).json({ error: dbError.message });
     return;
   }
-
-  // TODO: trigger async Mistral document analysis pipeline
-  // - extract text / OCR
-  // - generate summary + findings
-  // - chunk text and embed for RAG
-  // - flag if critical findings
 
   res.status(201).json(doc);
 });

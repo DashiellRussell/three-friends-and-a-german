@@ -14,7 +14,9 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
+import { TestEmbedButton } from "@/components/app/TestEmbed";
 import type { ReactNode } from "react";
+import { SummaryButton } from "@/components/app/SummaryButton";
 
 // ─── Feature Card ────────────────────────────────────────────
 function FeatureCard({
@@ -84,10 +86,7 @@ function WaitlistSection() {
             </div>
           </div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="mx-auto flex max-w-sm gap-2"
-          >
+          <form onSubmit={handleSubmit} className="mx-auto flex max-w-sm gap-2">
             <input
               type="email"
               value={email}
@@ -241,16 +240,19 @@ export default function Home() {
 
         <div className="mt-16 flex items-center gap-3">
           <div className="flex -space-x-2">
-            {["bg-violet-400", "bg-sky-400", "bg-amber-400", "bg-emerald-400"].map(
-              (bg, i) => (
-                <div
-                  key={i}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${bg} border-2 border-white text-[10px] font-semibold text-white`}
-                >
-                  {["S", "M", "A", "J"][i]}
-                </div>
-              )
-            )}
+            {[
+              "bg-violet-400",
+              "bg-sky-400",
+              "bg-amber-400",
+              "bg-emerald-400",
+            ].map((bg, i) => (
+              <div
+                key={i}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${bg} border-2 border-white text-[10px] font-semibold text-white`}
+              >
+                {["S", "M", "A", "J"][i]}
+              </div>
+            ))}
           </div>
           <p className="text-sm text-zinc-400">
             <span className="font-medium text-zinc-600">240+</span> people on
@@ -289,6 +291,10 @@ export default function Home() {
       <div id="waitlist">
         <WaitlistSection />
       </div>
+
+      <div>Hi</div>
+      <TestEmbedButton />
+      <SummaryButton />
 
       {/* Footer */}
       <footer className="border-t border-zinc-100 bg-white px-6 py-8">
