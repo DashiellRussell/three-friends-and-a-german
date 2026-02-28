@@ -75,9 +75,14 @@ export default function UploadCheckinPage() {
     const text = await handleFileSelect(file);
 
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("document_text", text);
+      formData.append("file_name", file.name);
+
       const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/documents/upload`,
-        { document_text: text },
+        formData,
         { headers: { "x-user-id": user?.id || "" } },
       );
       setStatus("✅ success: " + JSON.stringify(data));
