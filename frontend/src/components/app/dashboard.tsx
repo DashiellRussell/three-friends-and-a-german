@@ -3,6 +3,7 @@
 import { CHECKINS } from "@/lib/mock-data";
 import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
+import { ActivityGrid } from "./activity-grid";
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -138,6 +139,9 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
           <Pill>2 symptoms</Pill>
         </div>
       </button>
+
+      {/* Activity Grid */}
+      <ActivityGrid userId={user?.id || ""} />
     </div>
   );
 }
