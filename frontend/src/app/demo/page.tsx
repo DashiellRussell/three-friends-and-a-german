@@ -99,6 +99,7 @@ function LoginScreen() {
 function DemoApp() {
   const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [logSubTab, setLogSubTab] = useState<"log" | "files" | "reports" | undefined>(undefined);
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [callMode, setCallMode] = useState(false);
@@ -118,7 +119,7 @@ function DemoApp() {
   return (
     <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-[#fafafa] font-sans">
       {/* Top bar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 bg-white/80 px-5 py-3 backdrop-blur-lg">
+      <div className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-zinc-100 bg-white/80 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-lg">
         <div className="w-12" />
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
@@ -145,13 +146,13 @@ function DemoApp() {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => { setVoiceMode(true); setInputOpen(true); }} />}
-        {tab === "log" && <Log />}
+        {tab === "log" && <Log initialSubTab={logSubTab} />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
       </div>
 
       {/* Bottom tab bar */}
-      <div className="flex h-16 shrink-0 items-center justify-around border-t border-zinc-100 bg-white/90 px-1 backdrop-blur-lg">
+      <div className="sticky bottom-0 z-30 flex shrink-0 items-center justify-around border-t border-zinc-100 bg-white/90 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg">
         {NAV_ITEMS.map((item) =>
           item.id === "input" ? (
             <button
@@ -208,6 +209,10 @@ function DemoApp() {
           onClose={() => { setInputOpen(false); setVoiceMode(false); setCallMode(false); }}
           startInVoiceMode={voiceMode}
           startInCallMode={callMode}
+          onNavigate={(navTab, subTab) => {
+            setTab(navTab as Tab);
+            if (navTab === "log" && subTab) setLogSubTab(subTab as "log" | "files" | "reports");
+          }}
         />
       )}
       {inputOpen && !voiceMode && !callMode && (
