@@ -102,7 +102,8 @@ Triage flagging -> ElevenLabs + Twilio outbound call
 - **Symptoms:** `GET /api/symptoms`, `GET /api/symptoms/alerts`, `PATCH /api/symptoms/:id/dismiss`, `GET /api/symptoms/frequency`
 - **Documents:** `GET /api/documents`, `GET /api/documents/:id`, `POST /api/documents/upload`
 - **Reports:** `GET /api/reports`, `GET /api/reports/:id`, `POST /api/reports`
-- **Voice:** `GET /api/voice/signed-url`, `POST /api/voice/outbound-call`, `GET /api/voice/calls`, `PATCH /api/voice/calls/:id`
+- **Voice:** `GET /api/voice/signed-url`, `POST /api/voice/outbound-call`, `GET /api/voice/calls`, `PATCH /api/voice/calls/:id`, `POST /api/voice/sync-calls`, `POST /api/voice/webhook/call-complete`, `POST /api/voice/backfill`
+- **Profiles (public):** `POST /api/profiles/login`
 - Backend CORS allows `FRONTEND_URL` env var (defaults to localhost:3000)
 
 ## Coding Conventions
@@ -120,7 +121,7 @@ Triage flagging -> ElevenLabs + Twilio outbound call
 ## Environment Variables
 
 ### Backend (`backend/.env`)
-`MISTRAL_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_PHONE_NUMBER_ID`,
+`MISTRAL_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_OUTBOUND_AGENT_ID`, `ELEVENLABS_PHONE_NUMBER_ID`,
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`,
 `WANDB_API_KEY`, `PORT`, `FRONTEND_URL`
@@ -128,23 +129,45 @@ Triage flagging -> ElevenLabs + Twilio outbound call
 ### Frontend (`frontend/.env.local`)
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_BACKEND_URL`
 
+## Authentication & User Identity
+
+### Login Flow
+- Email-based login via `POST /api/profiles/login` (unauthenticated endpoint)
+- Backend finds or creates user profile by email
+- Frontend stores user profile in localStorage (`kira_user` key) via `UserProvider` context
+- All subsequent API calls include `x-user-id` header (dev mode) or Supabase JWT (production)
+- `useUser()` hook provides `user`, `loading`, `login()`, `logout()`, `refreshProfile()`
+
+### Auth Middleware (`backend/src/middleware/auth.ts`)
+- Dev mode: reads `x-user-id` header directly
+- Production: validates Supabase JWT from `Authorization: Bearer <token>` header
+- All protected routes use `requireAuth` middleware
+- Unprotected: `POST /api/profiles/login`, `POST /api/voice/webhook/*`, `POST /api/voice/backfill`
+
+### User Filtering
+- All backend queries MUST filter by `req.userId` — never return data from other users
+- Frontend components should use `useUser()` to get user ID for API calls
+- Pass `x-user-id` header on every authenticated request
+
 ## Current Implementation Status
 
 ### Completed
 - Full backend route scaffolding (profiles, checkins, symptoms, documents, reports, voice)
 - Auth middleware with dev shortcut + Supabase JWT validation
 - Database schema with 7 tables, RLS policies, and vector search RPCs
-- Frontend demo UI with all 4 tabs (dashboard, log, trends, profile)
-- Input overlay with voice/chat/upload modes (using mock data)
+- Frontend demo UI with 4 tabs (dashboard, log, trends, profile) behind login gate
+- Email-based login system with `UserProvider` context (`frontend/src/lib/user-context.tsx`)
+- ElevenLabs WebRTC voice check-in integration (input-overlay.tsx, real signed URLs)
+- Outbound proactive health calls via ElevenLabs + Twilio
+- Mistral transcript parsing for structured health data extraction
+- Auto-sync pipeline: outbound calls → poll ElevenLabs → parse transcript → create check-in + symptoms
+- Voice webhook for inbound call completion events
 - Client-side test PDF generation via jsPDF
 
 ### TODO / Not Yet Implemented
-- Mistral-based symptom extraction from voice/text transcripts
 - Document analysis pipeline (OCR, extraction, summarization, embeddings)
 - Report generation pipeline (RAG retrieval, Mistral generation, PDF rendering)
-- Frontend-backend API integration (currently all mock data)
-- Supabase client setup in frontend lib
-- Real ElevenLabs voice integration (currently mocked in input-overlay)
+- Frontend-backend API integration for log & trends tabs (currently mock data)
 - W&B Weave tracing for LLM calls
 
 ## Mistral Vibe CLI

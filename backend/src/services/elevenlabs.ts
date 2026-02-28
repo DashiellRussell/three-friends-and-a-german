@@ -1,13 +1,13 @@
+import axios from "axios";
+
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
 const BASE_URL = "https://api.elevenlabs.io";
 
 export async function getSignedUrl(agentId: string): Promise<string> {
-  const res = await fetch(
+  const { data } = await axios.get<{ signed_url: string }>(
     `${BASE_URL}/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
     { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
   );
-  if (!res.ok) throw new Error("Failed to get ElevenLabs signed URL");
-  const data = (await res.json()) as { signed_url: string };
   return data.signed_url;
 }
 

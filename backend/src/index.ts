@@ -6,7 +6,7 @@ import cors from "cors";
 
 import { errorHandler } from "./middleware/errorHandler";
 import profiles from "./routes/profiles";
-import checkins from "./routes/checkins";
+import checkins from "./routes/checkin";
 import symptoms from "./routes/symptoms";
 import documents from "./routes/documents";
 import reports from "./routes/reports";
@@ -21,7 +21,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/profiles", profiles);
-app.use("/api/checkins", checkins);
+app.use("/api/checkin", checkins);
 app.use("/api/symptoms", symptoms);
 app.use("/api/documents", documents);
 app.use("/api/reports", reports);
