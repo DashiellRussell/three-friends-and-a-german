@@ -1,74 +1,125 @@
 "use client";
 
-import { Chevron, Bar } from "./shared";
 import { CheckIn } from "./types";
+
+const MOOD_COLOR: Record<string, string> = {
+    great: "bg-emerald-500",
+    good: "bg-emerald-400",
+    okay: "bg-amber-400",
+    neutral: "bg-zinc-300",
+    bad: "bg-red-400",
+    terrible: "bg-red-500",
+};
+
+function moodDot(mood: string | null) {
+    const key = (mood || "neutral").toLowerCase();
+    return MOOD_COLOR[key] || "bg-zinc-300";
+}
 
 interface LogTabProps {
     checkIns: CheckIn[];
     expanded: string | number | null;
     toggle: (id: string | number) => void;
+    onViewDetail?: (checkIn: CheckIn) => void;
 }
 
-export function LogTab({ checkIns, expanded, toggle }: LogTabProps) {
+export function LogTab({ checkIns, expanded, toggle, onViewDetail }: LogTabProps) {
     return (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
             {checkIns.length === 0 && (
                 <div className="text-center py-10 text-sm text-zinc-400">No entries recorded yet.</div>
             )}
             {checkIns.map((c) => {
                 const date = new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
                 const time = new Date(c.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                const isOpen = expanded === c.id;
 
                 return (
-                    <button
+                    <div
                         key={c.id}
-                        onClick={() => toggle(c.id)}
-                        className={`w-full rounded-2xl bg-white p-4 text-left transition-all hover:shadow-sm ${c.flagged ? "border border-amber-200/80 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
+                        className={`w-full rounded-lg bg-white text-left transition-all ${c.flagged ? "border border-amber-200 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${c.flagged ? "bg-amber-50" : "bg-zinc-50"}`}>
-                                    {c.mood === "Great" || c.mood === "Good" ? "😊" : "😐"}
-                                </div>
-                                <div>
-                                    <div className="text-[13px] font-medium text-zinc-900">
-                                        {date} · {c.mood ? c.mood.charAt(0).toUpperCase() + c.mood.slice(1) : "Neutral"}
-                                    </div>
-                                    <div className="text-[11px] text-zinc-400">
-                                        {time} · E {c.energy || 0} · {c.sleep_hours || 0}h
-                                    </div>
-                                </div>
-                            </div>
-                            <Chevron open={expanded === c.id} />
-                        </div>
-
-                        {expanded === c.id && (
-                            <div className="mt-4 border-t border-zinc-50 pt-3" style={{ animation: "fadeUp 0.2s" }}>
-                                <div className="mb-3 grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => toggle(c.id)}
+                            className="w-full px-3.5 py-3 text-left"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`h-2 w-2 rounded-full shrink-0 ${moodDot(c.mood)}`} />
                                     <div>
-                                        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Energy</div>
-                                        <Bar value={c.energy || 0} />
-                                    </div>
-                                    <div>
-                                        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Symptoms</div>
-                                        <div className={`text-xs font-medium ${c.symptoms && c.symptoms.length ? "text-red-500" : "text-emerald-500"}`}>
-                                            {c.symptoms && c.symptoms.length ? c.symptoms.map(s => s.name).join(", ") : "None"}
+                                        <div className="text-[13px] font-medium text-zinc-900">
+                                            {date} <span className="text-zinc-300 font-normal">·</span> <span className="text-zinc-500 font-normal">{c.mood ? c.mood.charAt(0).toUpperCase() + c.mood.slice(1) : "Neutral"}</span>
+                                        </div>
+                                        <div className="text-[11px] text-zinc-400 mt-0.5">
+                                            {time} <span className="text-zinc-200">·</span> Energy {c.energy || 0}/10 <span className="text-zinc-200">·</span> {c.sleep_hours || 0}h sleep
                                         </div>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                    {c.flagged && (
+                                        <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Alert</span>
+                                    )}
+                                    {c.input_mode && (
+                                        <span className="text-[10px] text-zinc-300">{c.input_mode === "voice" ? "Voice" : "Text"}</span>
+                                    )}
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#d4d4d8"
+                                        strokeWidth="2.5"
+                                        strokeLinecap="round"
+                                        className={`shrink-0 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                                    >
+                                        <polyline points="9 18 15 12 9 6" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </button>
+
+                        {isOpen && (
+                            <div className="px-3.5 pb-3 border-t border-zinc-50" style={{ animation: "fadeUp 0.2s" }}>
+                                <div className="pt-2.5 grid grid-cols-3 gap-2">
+                                    <div className="rounded-md bg-zinc-50 px-2.5 py-2">
+                                        <div className="text-[10px] text-zinc-400 mb-0.5">Energy</div>
+                                        <div className="text-sm font-medium text-zinc-900">{c.energy || 0}<span className="text-zinc-300 text-[10px] font-normal">/10</span></div>
+                                    </div>
+                                    <div className="rounded-md bg-zinc-50 px-2.5 py-2">
+                                        <div className="text-[10px] text-zinc-400 mb-0.5">Sleep</div>
+                                        <div className="text-sm font-medium text-zinc-900">{c.sleep_hours || 0}<span className="text-zinc-300 text-[10px] font-normal">h</span></div>
+                                    </div>
+                                    <div className="rounded-md bg-zinc-50 px-2.5 py-2">
+                                        <div className="text-[10px] text-zinc-400 mb-0.5">Symptoms</div>
+                                        <div className={`text-sm font-medium ${c.symptoms && c.symptoms.length ? "text-red-500" : "text-emerald-500"}`}>
+                                            {c.symptoms ? c.symptoms.length : 0}
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {(c.summary || c.notes) && (
-                                    <p className="mt-2 text-xs italic leading-relaxed text-zinc-500">
-                                        &ldquo;{c.summary || c.notes}&rdquo;
+                                    <p className="mt-2.5 text-[12px] leading-relaxed text-zinc-500 line-clamp-2">
+                                        {c.summary || c.notes}
                                     </p>
                                 )}
+
                                 {c.flagged && c.flag_reason && (
-                                    <div className="mt-3 rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/50 px-3 py-2 text-[11px] font-medium text-amber-700">
-                                        ⚠ {c.flag_reason}
+                                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-700">
+                                        {c.flag_reason}
                                     </div>
+                                )}
+
+                                {onViewDetail && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onViewDetail(c); }}
+                                        className="mt-2.5 w-full rounded-md bg-zinc-900 py-2 text-[12px] font-medium text-white transition-colors hover:bg-zinc-800 active:bg-zinc-700"
+                                    >
+                                        View details
+                                    </button>
                                 )}
                             </div>
                         )}
-                    </button>
+                    </div>
                 );
             })}
         </div>
