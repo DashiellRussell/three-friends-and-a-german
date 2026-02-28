@@ -1,14 +1,19 @@
 import { Mistral } from "@mistralai/mistralai";
 import { z } from "zod";
 
-let mistral: Mistral;
+let _client: Mistral;
 
 function getMistral(): Mistral {
-  if (!mistral) {
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY! });
+  if (!_client) {
+    _client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY! });
   }
-  return mistral;
+  return _client;
 }
+
+/** Lazy-initialized Mistral client — use for direct API calls */
+export const mistral = new Proxy({} as Mistral, {
+  get: (_, prop) => getMistral()[prop as keyof Mistral],
+});
 
 export async function embedText(text: string): Promise<number[]> {
   const result = await getMistral().embeddings.create({

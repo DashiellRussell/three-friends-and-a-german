@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import axios from "axios";
+import { useUser } from "@/lib/user-context";
 type UploadStage = "idle" | "uploading" | "processing" | "done";
 
 async function extractPdfText(file: File): Promise<string> {
@@ -31,6 +32,7 @@ async function extractPdfText(file: File): Promise<string> {
 
 
 export default function UploadCheckinPage() {
+  const { user } = useUser();
   const [stage, setStage] = useState<UploadStage>("idle");
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState("");
@@ -81,7 +83,7 @@ export default function UploadCheckinPage() {
       const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/documents/upload`,
         formData,
-        { headers: { "x-user-id": "51b5ade8-77df-4379-95f5-404685a44980" } },
+        { headers: { "x-user-id": user?.id || "" } },
       );
       setStatus("✅ success: " + JSON.stringify(data));
     } catch (e) {

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import axios from "axios";
+import { useUser } from "@/lib/user-context";
 
 export function SummaryButton() {
+  const { user } = useUser();
   const [status, setStatus] = useState<string | null>(null);
 
   async function handleClick() {
@@ -11,7 +13,8 @@ export function SummaryButton() {
     try {
       const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin/summary`,
-        { user_id: "51b5ade8-77df-4379-95f5-404685a44980" },
+        {},
+        { headers: { "x-user-id": user?.id || "" } },
       );
       setStatus("✅ success: " + JSON.stringify(data));
     } catch (e) {

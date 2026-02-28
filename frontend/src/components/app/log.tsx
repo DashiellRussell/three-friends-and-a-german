@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUser } from "@/lib/user-context";
 import { CheckIn, Report, Document } from "./types";
 import { ReportConfig, GeneratingView, ReportSuccessView } from "./report-config";
 import { LogTab } from "./log-tab";
@@ -8,6 +9,7 @@ import { FilesTab } from "./files-tab";
 import { ReportsTab } from "./reports-tab";
 
 export function Log() {
+  const { user } = useUser();
   const [tab, setTab] = useState<"log" | "files" | "reports">("log");
   const [expanded, setExpanded] = useState<number | string | null>(null);
   const [view, setView] = useState<"entries" | "report-config" | "generating" | "report">("entries");
@@ -15,34 +17,29 @@ export function Log() {
   // Data states
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  // const [documents, setDocuments] = useState<Document[]>([]);
 
-  const uuid = "51b5ade8-77df-4379-95f5-404685a44980";
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
   useEffect(() => {
+    if (!user) return;
+
     // Fetch user check-ins
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/checkins`, { headers: { uuid } })
+    fetch(`${backendUrl}/api/checkin`, { headers: { "x-user-id": user.id } })
       .then(res => res.json())
-      .then(data => setCheckIns(data.check_ins || []))
+      .then(data => setCheckIns(Array.isArray(data) ? data : (data.check_ins || [])))
       .catch(console.error);
 
     // Fetch user generated reports
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/reports`, { headers: { uuid } })
+    fetch(`${backendUrl}/api/reports`, { headers: { "x-user-id": user.id } })
       .then(res => res.json())
       .then(data => setReports(data.reports || []))
       .catch(console.error);
-
-    // Fetch user files / documents
-    // fetch("http://localhost:3001/api/documents", { headers: { uuid } })
-    //   .then(res => res.json())
-    //   .then(data => setDocuments(data.documents || []))
-    //   .catch(console.error);
-  }, [view]);
+  }, [user, view, backendUrl]);
 
   const toggle = (id: number | string) => setExpanded(expanded === id ? null : id);
 
   if (view === "report-config") {
-    return <ReportConfig setView={setView} uuid={uuid} />;
+    return <ReportConfig setView={setView} userId={user?.id || ""} />;
   }
 
   if (view === "generating") {

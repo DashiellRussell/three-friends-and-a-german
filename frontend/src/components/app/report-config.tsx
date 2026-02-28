@@ -5,10 +5,10 @@ import { Toggle, SegmentedControl } from "./shared";
 
 interface ReportConfigProps {
     setView: (v: "entries" | "report-config" | "generating" | "report") => void;
-    uuid: string;
+    userId: string;
 }
 
-export function ReportConfig({ setView, uuid }: ReportConfigProps) {
+export function ReportConfig({ setView, userId }: ReportConfigProps) {
     const [reportRange, setReportRange] = useState("week");
     const [reportDetail, setReportDetail] = useState("summary");
     const [incCheckins, setIncCheckins] = useState(true);
@@ -34,7 +34,7 @@ export function ReportConfig({ setView, uuid }: ReportConfigProps) {
 
             const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/reports/generate?${params.toString()}`, {
                 method: "GET",
-                headers: { uuid },
+                headers: { "x-user-id": userId },
             });
 
             if (!response.ok) throw new Error("Failed to generate report");

@@ -19,8 +19,8 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // Dev shortcut: x-user-id header
-  const devUserId = req.headers["uuid"] as string | undefined;
+  // Dev shortcut: x-user-id or uuid header
+  const devUserId = (req.headers["x-user-id"] || req.headers["uuid"]) as string | undefined;
   if (devUserId) {
     req.userId = devUserId;
     return next();

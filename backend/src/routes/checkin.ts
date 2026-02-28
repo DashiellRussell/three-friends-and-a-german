@@ -8,19 +8,97 @@ import {
   generateChatOpener,
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
+// All checkin routes require authentication
+router.use(requireAuth);
+
+// List check-ins for the logged-in user
+router.get("/", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const limit = parseInt(req.query.limit as string) || 30;
+  const offset = parseInt(req.query.offset as string) || 0;
+
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("*, symptoms(*)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  res.json(data);
+});
+
+// Get single check-in by ID
+router.get("/:id", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("*, symptoms(*)")
+    .eq("id", req.params.id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    res.status(404).json({ error: "Check-in not found" });
+    return;
+  }
+  res.json(data);
+});
+
+// Dashboard stats summary
+router.get("/stats/summary", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const days = parseInt(req.query.days as string) || 7;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const { data, error } = await supabase
+    .from("check_ins")
+    .select("energy, sleep_hours, flagged, created_at")
+    .eq("user_id", userId)
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  const checkins = data || [];
+  const avgEnergy = checkins.length
+    ? checkins.reduce((s, c) => s + (c.energy || 0), 0) / checkins.length
+    : 0;
+  const avgSleep = checkins.length
+    ? checkins.reduce((s, c) => s + (c.sleep_hours || 0), 0) / checkins.length
+    : 0;
+  const flaggedCount = checkins.filter((c) => c.flagged).length;
+
+  res.json({
+    total_checkins: checkins.length,
+    avg_energy: Math.round(avgEnergy * 10) / 10,
+    avg_sleep: Math.round(avgSleep * 10) / 10,
+    flagged_count: flaggedCount,
+    streak: checkins.length,
+  });
+});
+
 interface CheckInBody {
   transcript: string;
-  user_id: string;
 }
 
 router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
-  const { transcript, user_id } = req.body;
+  const { transcript } = req.body;
+  const user_id = req.userId!;
 
-  if (!transcript || !user_id) {
-    res.status(400).json({ error: "transcript and user_id are required" });
+  if (!transcript) {
+    res.status(400).json({ error: "transcript is required" });
     return;
   }
 
@@ -56,13 +134,8 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
 router.post(
   "/summary",
-  async (req: Request<{}, {}, { user_id: string }>, res: Response) => {
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: "user_id is required" });
-      return;
-    }
+  async (req: Request, res: Response) => {
+    const user_id = req.userId!;
 
     // Load last 7 days of check-ins for this user
     const sevenDaysAgo = new Date();
