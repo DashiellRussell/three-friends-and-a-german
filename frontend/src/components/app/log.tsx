@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CHECKINS, LAB_RESULTS, REPORT_DATA, statusVariant } from "@/lib/mock-data";
 import { Pill, Chevron, Bar, Toggle, SegmentedControl } from "./shared";
 
@@ -15,30 +15,104 @@ export function Log() {
   const [incSymptoms, setIncSymptoms] = useState(true);
   const [incTrends, setIncTrends] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
   const toggle = (id: number | string) =>
     setExpanded(expanded === id ? null : id);
 
-  const handleGen = () => {
+  const handleGen = async () => {
     setView("generating");
-    setTimeout(() => setView("report"), 2000);
+    setError(null);
+    try {
+      const response = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timeRange: reportRange,
+          detailLevel: reportDetail,
+          include: {
+            checkins: incCheckins,
+            docs: incDocs,
+            meds: incMeds,
+            symptoms: incSymptoms,
+            trends: incTrends,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      // const data = await response.json();
+      // Handle data processing here if necessary, or just switch views
+      setView("report");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setView("report-config"); // Or show an error state
+    }
   };
 
-  const rangeLabels: Record<string, string> = {
-    "3days": "Feb 26–28 · 3 check-ins",
-    week: "Feb 22–28 · 7 check-ins, 1 doc",
-    "2weeks": "Feb 14–28 · 10 check-ins, 1 doc",
-    month: "Jan 28 – Feb 28 · 24 check-ins, 3 docs",
-  };
+  // Generate range labels and date labels based on the current date
+  const { rangeLabels, rangeDateLabels } = useMemo<{
+    rangeLabels: Record<string, string>;
+    rangeDateLabels: Record<string, string>;
+  }>(() => {
+    const today = new Date();
+
+    const formatLabelStr = (past: Date) => {
+      const sameMonth = past.getMonth() === today.getMonth() && past.getFullYear() === today.getFullYear();
+      const startMonth = past.toLocaleDateString("en-US", { month: "short" });
+      const startDay = past.getDate();
+      const endMonth = today.toLocaleDateString("en-US", { month: "short" });
+      const endDay = today.getDate();
+
+      if (sameMonth) {
+        return `${startMonth} ${startDay}–${endDay}`;
+      }
+      return `${startMonth} ${startDay} – ${endMonth} ${endDay}`;
+    };
+
+    const formatRangeDateStr = (past: Date) => {
+      const sameMonth = past.getMonth() === today.getMonth() && past.getFullYear() === today.getFullYear();
+      const startMonth = past.toLocaleDateString("en-US", { month: "short" });
+      const startDay = past.getDate();
+      const endMonth = today.toLocaleDateString("en-US", { month: "short" });
+      const endDay = today.getDate();
+
+      if (sameMonth) {
+        return `${startDay}–${endDay} ${endMonth}`;
+      }
+      return `${startDay} ${startMonth} – ${endDay} ${endMonth}`;
+    };
+
+    const d3 = new Date(today); d3.setDate(d3.getDate() - 2);
+    const dWeek = new Date(today); dWeek.setDate(dWeek.getDate() - 6);
+    const dMonth = new Date(today); dMonth.setMonth(dMonth.getMonth() - 1);
+    const d6Months = new Date(today); d6Months.setMonth(d6Months.getMonth() - 6);
+
+    return {
+      rangeLabels: {
+        "3days": `${formatLabelStr(d3)} · 3 check-ins`,
+        week: `${formatLabelStr(dWeek)} · 7 check-ins, 1 doc`,
+        month: `${formatLabelStr(dMonth)} · 24 check-ins, 3 docs`,
+        "6months": `${formatLabelStr(d6Months)} · 142 check-ins, 18 docs`,
+      },
+      rangeDateLabels: {
+        "3days": formatRangeDateStr(d3),
+        week: formatRangeDateStr(dWeek),
+        month: formatRangeDateStr(dMonth),
+        "6months": formatRangeDateStr(d6Months),
+      },
+    };
+  }, []);
+
   const detailLabels: Record<string, string> = {
     brief: "Key findings only",
     summary: "Findings + discussion points",
     detailed: "Full daily breakdown",
-  };
-  const rangeDateLabels: Record<string, string> = {
-    "3days": "26–28 Feb",
-    week: "22–28 Feb",
-    "2weeks": "14–28 Feb",
-    month: "28 Jan – 28 Feb",
   };
 
   // Report config
@@ -60,8 +134,8 @@ export function Log() {
             options={[
               { value: "3days", label: "3 Days" },
               { value: "week", label: "1 Week" },
-              { value: "2weeks", label: "2 Weeks" },
-              { value: "month", label: "Month" },
+              { value: "month", label: "1 Month" },
+              { value: "6months", label: "6 Months" },
             ]}
           />
           <div className="mt-2 text-[11px] text-zinc-400">{rangeLabels[reportRange]}</div>
@@ -96,6 +170,11 @@ export function Log() {
           </div>
         </div>
 
+        {error && (
+          <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
         <button
           onClick={handleGen}
           className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-zinc-900 py-4 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.99]"
@@ -134,11 +213,10 @@ export function Log() {
           {REPORT_DATA.findings.map((f, i) => (
             <div
               key={i}
-              className={`mb-2 flex gap-3 rounded-2xl p-3.5 text-[13px] leading-relaxed ${
-                i < 2
-                  ? "border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/50 text-zinc-700"
-                  : "border border-zinc-100 bg-white text-zinc-700"
-              }`}
+              className={`mb-2 flex gap-3 rounded-2xl p-3.5 text-[13px] leading-relaxed ${i < 2
+                ? "border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/50 text-zinc-700"
+                : "border border-zinc-100 bg-white text-zinc-700"
+                }`}
             >
               <span className={`mt-0.5 shrink-0 text-[10px] font-bold ${i < 2 ? "text-amber-600" : "text-zinc-300"}`}>{i + 1}</span>
               {f}
@@ -239,16 +317,14 @@ export function Log() {
         <button
           key={c.id}
           onClick={() => toggle(c.id)}
-          className={`mb-2.5 w-full rounded-2xl bg-white p-4 text-left transition-all hover:shadow-sm ${
-            c.flagged ? "border border-amber-200/80 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"
-          }`}
+          className={`mb-2.5 w-full rounded-2xl bg-white p-4 text-left transition-all hover:shadow-sm ${c.flagged ? "border border-amber-200/80 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"
+            }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
-                className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${
-                  c.flagged ? "bg-amber-50" : "bg-zinc-50"
-                }`}
+                className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${c.flagged ? "bg-amber-50" : "bg-zinc-50"
+                  }`}
               >
                 {c.mood === "Great" ? "😊" : c.mood === "Good" ? "🙂" : "😐"}
               </div>
