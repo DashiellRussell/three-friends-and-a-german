@@ -108,8 +108,11 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Failed to get signed URL (${res.status})`);
       }
-      const { signed_url } = await res.json();
-      await conversation.startSession({ signedUrl: signed_url });
+      const { signed_url, dynamic_variables } = await res.json();
+      await conversation.startSession({
+        signedUrl: signed_url,
+        dynamicVariables: dynamic_variables,
+      });
     } catch (err) {
       setError((err as Error).message);
     }

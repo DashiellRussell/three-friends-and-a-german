@@ -7,7 +7,8 @@ const router = Router();
 router.use(requireAuth);
 
 // GET /api/voice/signed-url — get ElevenLabs signed URL for WebRTC voice session
-router.get("/signed-url", async (_req: Request, res: Response) => {
+router.get("/signed-url", async (req: Request, res: Response) => {
+  const userId = req.userId!;
   const agentId = process.env.ELEVENLABS_AGENT_ID;
   if (!agentId) {
     res.status(500).json({ error: "ELEVENLABS_AGENT_ID not configured" });
@@ -15,8 +16,22 @@ router.get("/signed-url", async (_req: Request, res: Response) => {
   }
 
   try {
+    // Fetch user profile for dynamic variables
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name, conditions, allergies, phone_number")
+      .eq("id", userId)
+      .single();
+
     const signedUrl = await getSignedUrl(agentId);
-    res.json({ signed_url: signedUrl });
+    res.json({
+      signed_url: signedUrl,
+      dynamic_variables: {
+        user_name: profile?.display_name || "there",
+        conditions: profile?.conditions?.join(", ") || "none listed",
+        allergies: profile?.allergies?.join(", ") || "none listed",
+      },
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
