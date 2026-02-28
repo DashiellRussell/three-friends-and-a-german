@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 
 import { errorHandler } from "./middleware/errorHandler";
 import profiles from "./routes/profiles";
@@ -9,8 +11,6 @@ import symptoms from "./routes/symptoms";
 import documents from "./routes/documents";
 import reports from "./routes/reports";
 import voice from "./routes/voice";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

@@ -1,0 +1,2 @@
+id,email,display_name,date_of_birth,blood_type,conditions,allergies,phone_number,timezone,emergency_contact,checkin_time,voice_pref,language,onboarding_completed,onboarding_step,onboarding_data,created_at,updated_at,gender
+51b5ade8-77df-4379-95f5-404685a44980,john.wick@gmail.com,John Wick,1991-03-28,A,[],[],0478665529,AEST,,18:00:00,,en,true,0,,2026-02-28 05:55:08+00,2026-02-28 07:22:50.650262+00,Male
