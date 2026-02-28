@@ -3,6 +3,7 @@ import multer from "multer";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
+import { processDocument } from "../services/documentPipeline";
 
 const router = Router();
 router.use(requireAuth);
@@ -104,6 +105,11 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     res.status(500).json({ error: dbError.message });
     return;
   }
+
+  // Run document chunking pipeline in background (non-blocking)
+  processDocument(doc.id, document_text, docType).catch((err) => {
+    console.error(`[documents] Chunking pipeline failed for ${doc.id}:`, err.message);
+  });
 
   res.status(201).json(doc);
 });

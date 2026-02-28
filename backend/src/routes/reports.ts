@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { generateReport } from "../services/generateReport";
+import { detectPatterns } from "../services/patternDetection";
+import { findRelatedContext } from "../services/crossReference";
 
 const router = Router();
 router.use(requireAuth);
@@ -75,6 +77,30 @@ router.get("/generate", async (req: Request, res: Response) => {
       .gte("created_at", startIso)
       .lte("created_at", endIso);
 
+    // Fetch embedding-derived patterns
+    let patterns: any[] = [];
+    try {
+      patterns = await detectPatterns(userId);
+    } catch (err) {
+      console.error("[reports] Pattern detection failed (non-blocking):", (err as Error).message);
+    }
+
+    // Fetch RAG context for each unique symptom cluster
+    let ragContext = "";
+    try {
+      const symptomNames = [...new Set((symptoms || []).map((s: any) => s.name))];
+      if (symptomNames.length > 0) {
+        const related = await findRelatedContext(
+          symptomNames.join(", "),
+          userId,
+          { limit: 5, includeDocuments: true, includeCheckins: false },
+        );
+        ragContext = related.combinedContext || "";
+      }
+    } catch (err) {
+      console.error("[reports] RAG context failed (non-blocking):", (err as Error).message);
+    }
+
     const doc = await generateReport({
       timeRange: timeRange,
       detailLevel: detailLevel,
@@ -88,7 +114,9 @@ router.get("/generate", async (req: Request, res: Response) => {
       profile: profile || null,
       checkIns: checkIns || [],
       symptoms: symptoms || [],
-      documents: documents || []
+      documents: documents || [],
+      patterns,
+      ragContext,
     });
 
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"));

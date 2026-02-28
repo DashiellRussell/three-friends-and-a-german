@@ -80,16 +80,21 @@ The summary will be sent to a text embedding model to power future health analyt
 
 export async function generateConversationContext(
   checkIns: { date: string; data: CheckInExtraction }[],
+  relevantContext?: string,
 ): Promise<string> {
   const client = getMistral();
+
+  const relevantContextBlock = relevantContext
+    ? `\n\nRELEVANT HEALTH CONTEXT FROM PATIENT RECORDS:\n${relevantContext}\n\nUse this context naturally in conversation — reference specific past symptoms, document findings, or patterns when relevant. Don't dump all information at once; bring it up when the patient mentions something related.`
+    : "";
 
   const response = await client.chat.complete({
     model: "mistral-large-latest",
     messages: [
       {
         role: "system",
-        content: `You are generating a system prompt for a conversational health AI assistant. 
-        
+        content: `You are generating a system prompt for a conversational health AI assistant.
+
 Your output will be injected directly as a system prompt into a voice-based AI that is about to start a daily health check-in conversation with the user.
 
 The system prompt you write should:
@@ -98,8 +103,9 @@ The system prompt you write should:
 - Use natural relative time references like "this morning", "yesterday", "3 days ago", "last Friday" — never raw dates
 - Highlight any patterns, recurring symptoms, or notable changes across the week
 - Flag anything concerning so the AI can gently follow up
+- If relevant medical documents or past health records are provided, incorporate those findings naturally (e.g. "You know from their recent blood test that...")
 - Be concise — this is a system prompt, not an essay. Aim for 150-250 words.
-- Do NOT invent information not present in the check-in data`,
+- Do NOT invent information not present in the check-in data or provided context`,
       },
       {
         role: "user",
@@ -117,7 +123,7 @@ ${checkIns
 - Notes: ${data.notes ?? "none"}
 - Flagged: ${data.flagged ? `Yes — ${data.flag_reason}` : "No"}`,
   )
-  .join("\n\n")}
+  .join("\n\n")}${relevantContextBlock}
 
 Write a system prompt for the conversational AI that will speak with this user right now.`,
       },

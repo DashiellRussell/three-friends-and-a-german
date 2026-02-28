@@ -7,6 +7,7 @@ import {
   getConversationDetails,
 } from "../services/elevenlabs";
 import { requireAuth } from "../middleware/auth";
+import { findRelatedContext } from "../services/crossReference";
 
 const router = Router();
 
@@ -466,6 +467,21 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       .eq("id", userId)
       .single();
 
+    // Fetch RAG context for voice session
+    let healthContext = "";
+    try {
+      const related = await findRelatedContext(
+        `recent health concerns for ${profile?.display_name || "user"}`,
+        userId,
+        { limit: 3, includeDocuments: true, includeCheckins: true },
+      );
+      if (related.combinedContext) {
+        healthContext = related.combinedContext;
+      }
+    } catch (err) {
+      console.error("[voice/signed-url] RAG context failed (non-blocking):", (err as Error).message);
+    }
+
     const signedUrl = await getSignedUrl(agentId);
     res.json({
       signed_url: signedUrl,
@@ -473,6 +489,7 @@ router.get("/signed-url", async (req: Request, res: Response) => {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
         allergies: profile?.allergies?.join(", ") || "none listed",
+        ...(healthContext ? { health_context: healthContext } : {}),
       },
     });
   } catch (err) {

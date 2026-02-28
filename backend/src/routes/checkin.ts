@@ -9,6 +9,8 @@ import {
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
+import { findRelatedContext } from "../services/crossReference";
+import { checkNewCheckinPattern } from "../services/patternDetection";
 
 const router = Router();
 
@@ -129,7 +131,25 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
-  res.status(201).json({ checkin: data });
+  // Step 4: Check for related context and patterns (non-blocking)
+  let pattern = null;
+  let relatedContext = null;
+  try {
+    const [patternResult, contextResult] = await Promise.all([
+      checkNewCheckinPattern(embedding, user_id),
+      findRelatedContext(extracted.summary, user_id, { limit: 3 }),
+    ]);
+    pattern = patternResult;
+    relatedContext = contextResult;
+  } catch (err) {
+    console.error("[checkin] RAG/pattern check failed (non-blocking):", (err as Error).message);
+  }
+
+  res.status(201).json({
+    checkin: data,
+    ...(pattern ? { pattern } : {}),
+    ...(relatedContext && relatedContext.combinedContext ? { related_context: relatedContext.combinedContext } : {}),
+  });
 });
 
 router.post(
@@ -182,7 +202,25 @@ router.post(
       };
     });
 
-    const context = await generateConversationContext(mapped);
+    // Fetch RAG context from vector search for richer conversation
+    let ragContext: string | undefined;
+    try {
+      const recentSummaries = checkIns.map((ci) => ci.summary).filter(Boolean).join(". ");
+      if (recentSummaries) {
+        const related = await findRelatedContext(recentSummaries, user_id, {
+          limit: 5,
+          includeDocuments: true,
+          includeCheckins: false, // Already have recent check-ins
+        });
+        if (related.combinedContext) {
+          ragContext = related.combinedContext;
+        }
+      }
+    } catch (err) {
+      console.error("[summary] RAG context fetch failed (non-blocking):", (err as Error).message);
+    }
+
+    const context = await generateConversationContext(mapped, ragContext);
 
     res.json({
       context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
@@ -205,11 +243,24 @@ router.post(
   "/chat/start",
   async (req: Request<{}, {}, ChatStartBody>, res: Response) => {
     const { systemPrompt } = req.body;
+    const userId = req.userId!;
     if (!systemPrompt) {
       res.status(400).json({ error: "systemPrompt is required" });
       return;
     }
-    const message = await generateChatOpener(systemPrompt);
+
+    // Enrich system prompt with RAG context
+    let enrichedPrompt = systemPrompt;
+    try {
+      const related = await findRelatedContext("recent health concerns and symptoms", userId, { limit: 3 });
+      if (related.combinedContext) {
+        enrichedPrompt = `${systemPrompt}\n\n${related.combinedContext}\n\nUse this context naturally — reference specific findings when relevant.`;
+      }
+    } catch (err) {
+      console.error("[chat/start] RAG failed (non-blocking):", (err as Error).message);
+    }
+
+    const message = await generateChatOpener(enrichedPrompt);
     res.json({ message });
   },
 );
@@ -228,11 +279,27 @@ router.post(
   "/chat/message",
   async (req: Request<{}, {}, ChatMessageBody>, res: Response) => {
     const { systemPrompt, history } = req.body;
+    const userId = req.userId!;
     if (!systemPrompt || !history) {
       res.status(400).json({ error: "systemPrompt and history are required" });
       return;
     }
-    const message = await generateChatReply(systemPrompt, history);
+
+    // Enrich system prompt with RAG context based on latest user message
+    let enrichedPrompt = systemPrompt;
+    const lastUserMessage = [...history].reverse().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      try {
+        const related = await findRelatedContext(lastUserMessage.content, userId, { limit: 3 });
+        if (related.combinedContext) {
+          enrichedPrompt = `${systemPrompt}\n\n${related.combinedContext}\n\nUse this context naturally — reference specific past symptoms, document findings, or patterns when relevant. Don't dump all information at once.`;
+        }
+      } catch (err) {
+        console.error("[chat/message] RAG failed (non-blocking):", (err as Error).message);
+      }
+    }
+
+    const message = await generateChatReply(enrichedPrompt, history);
     res.json({ message });
   },
 );

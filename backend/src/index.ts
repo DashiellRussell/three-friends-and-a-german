@@ -11,6 +11,7 @@ import symptoms from "./routes/symptoms";
 import documents from "./routes/documents";
 import reports from "./routes/reports";
 import voice from "./routes/voice";
+import patterns from "./routes/patterns";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +27,7 @@ app.use("/api/symptoms", symptoms);
 app.use("/api/documents", documents);
 app.use("/api/reports", reports);
 app.use("/api/voice", voice);
+app.use("/api/patterns", patterns);
 
 // Health check
 app.get("/ping", (_req, res) => {
