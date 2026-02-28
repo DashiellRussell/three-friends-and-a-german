@@ -131,13 +131,26 @@ export const generateReport = async (data: any) => {
             summaryText = `(MOCK AI) ${summaryText} The patient also experienced recurring negative symptoms, including low energy and reported headaches over the tracked period. Please monitor these closely.`;
         } else {
             try {
+                // ── RAG-enriched executive summary ──
+                // Two sources of vector intelligence feed into the report:
+                //
+                // 1. patterns: Clusters of similar check-in embeddings detected by
+                //    patternDetection.ts (e.g., "recurring headache + fatigue over 12 days")
+                //
+                // 2. ragContext: Relevant document chunks found by crossReference.ts
+                //    via pgvector similarity search (e.g., blood test showing low hemoglobin)
+                //
+                // Both are injected into the Mistral prompt so the AI can cross-reference
+                // symptoms with document findings in the executive summary.
                 const patterns = data.patterns || [];
                 const ragContext = data.ragContext || "";
 
+                // Format detected patterns for injection into the LLM prompt
                 const patternsBlock = patterns.length > 0
                     ? `\n\nDetected Health Patterns (from embedding analysis):\n${patterns.map((p: any) => `- ${p.description} (${p.occurrences} occurrences, confidence: ${(p.confidence * 100).toFixed(0)}%)`).join('\n')}`
                     : "";
 
+                // Format RAG-retrieved document context for injection
                 const ragBlock = ragContext
                     ? `\n\nRelevant Medical Documents (from vector search):\n${ragContext}`
                     : "";

@@ -2,6 +2,9 @@ import { Router, Request, Response } from "express";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { generateReport } from "../services/generateReport";
+// RAG imports for enriching the PDF report with vector-intelligence data:
+// - detectPatterns: clusters check-in embeddings to find recurring health patterns
+// - findRelatedContext: searches document chunks by vector similarity for relevant findings
 import { detectPatterns } from "../services/patternDetection";
 import { findRelatedContext } from "../services/crossReference";
 
@@ -77,7 +80,13 @@ router.get("/generate", async (req: Request, res: Response) => {
       .gte("created_at", startIso)
       .lte("created_at", endIso);
 
-    // Fetch embedding-derived patterns
+    // ── RAG enrichment for the report ──
+    // These two operations add vector-intelligence data to the PDF:
+
+    // 1. Pattern detection: clusters check-in embeddings to find recurring themes.
+    //    Uses patternDetection.ts which runs pgvector similarity queries (match_check_ins)
+    //    and groups results using a connected-components algorithm (similarity >= 0.82).
+    //    Example result: "Recurring headache + fatigue cluster over 12 days (5 occurrences)"
     let patterns: any[] = [];
     try {
       patterns = await detectPatterns(userId);
@@ -85,7 +94,11 @@ router.get("/generate", async (req: Request, res: Response) => {
       console.error("[reports] Pattern detection failed (non-blocking):", (err as Error).message);
     }
 
-    // Fetch RAG context for each unique symptom cluster
+    // 2. RAG context: takes the user's unique symptom names as a search query,
+    //    embeds them, and finds the most semantically similar document chunks.
+    //    Example: querying "headache, fatigue, dizziness" might surface a blood test
+    //    document chunk showing "Hemoglobin: 11.2 g/dL — LOW".
+    //    includeCheckins: false because we already have check-ins from the DB query above.
     let ragContext = "";
     try {
       const symptomNames = [...new Set((symptoms || []).map((s: any) => s.name))];
@@ -101,6 +114,10 @@ router.get("/generate", async (req: Request, res: Response) => {
       console.error("[reports] RAG context failed (non-blocking):", (err as Error).message);
     }
 
+    // Pass both patterns and ragContext to the PDF generator.
+    // generateReport() (in generateReport.ts) injects these into the Mistral prompt
+    // for the executive summary, enabling cross-referencing like:
+    // "Patient reported recurring fatigue. Blood panel showed hemoglobin at 11.2 g/dL."
     const doc = await generateReport({
       timeRange: timeRange,
       detailLevel: detailLevel,

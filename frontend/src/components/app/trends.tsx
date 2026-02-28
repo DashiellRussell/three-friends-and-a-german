@@ -5,11 +5,15 @@ import { CHECKINS, MOOD_MAP } from "@/lib/mock-data";
 import { SegmentedControl, Sparkline } from "./shared";
 import { useUser } from "@/lib/user-context";
 
+// HealthPattern mirrors the backend's patternDetection.ts HealthPattern type.
+// These are embedding-derived clusters: groups of check-ins whose 1024-dim vectors
+// are similar enough (cosine >= 0.82) to indicate a recurring health pattern.
+// The backend generates a Mistral-written human-readable description for each.
 interface HealthPattern {
   pattern_type: "recurring_symptom" | "symptom_cluster" | "trend_change";
   description: string;
-  confidence: number;
-  occurrences: number;
+  confidence: number;   // 0-1, based on cluster size + symptom overlap
+  occurrences: number;  // number of check-ins in this cluster
   first_seen: string;
   last_seen: string;
 }
@@ -52,7 +56,13 @@ export function Trends() {
   const avgEnergy = (energyD.reduce((a, b) => a + b, 0) / energyD.length).toFixed(1);
   const avgSleep = (sleepD.reduce((a, b) => a + b, 0) / sleepD.length).toFixed(1);
 
-  // Fetch real pattern data from backend
+  // Fetch RAG-powered pattern detection results from the backend.
+  // This calls GET /api/patterns which runs the full embedding clustering pipeline:
+  // 1. Fetches last 30 days of check-in embeddings
+  // 2. Queries pgvector for nearest neighbors per check-in
+  // 3. Clusters via connected-components algorithm (similarity >= 0.82)
+  // 4. Asks Mistral to describe each cluster in plain English
+  // Results are cached server-side for 1 hour.
   useEffect(() => {
     if (!user?.id) return;
 

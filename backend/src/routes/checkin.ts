@@ -9,6 +9,8 @@ import {
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
+// RAG imports: crossReference searches document chunks + check-ins by vector similarity,
+// patternDetection clusters check-in embeddings to find recurring health patterns
 import { findRelatedContext } from "../services/crossReference";
 import { checkNewCheckinPattern } from "../services/patternDetection";
 
@@ -107,7 +109,10 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
   // Step 1: extract structured data + summary from raw transcript
   const extracted = await extractCheckinData(transcript);
 
-  // Step 2: embed the clean summary (not the noisy raw transcript)
+  // Step 2: embed the clean summary (not the noisy raw transcript) into a 1024-dim vector.
+  // This vector is stored in check_ins.embedding and powers two RAG features:
+  //   a) Vector similarity search via match_check_ins() RPC (used by findRelatedContext)
+  //   b) Pattern detection clustering (used by detectPatterns / checkNewCheckinPattern)
   const embedding = await embedText(extracted.summary);
 
   // Step 3: insert everything into Supabase
@@ -131,7 +136,15 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
-  // Step 4: Check for related context and patterns (non-blocking)
+  // Step 4: RAG enrichment — runs in parallel, non-blocking
+  // Two concurrent vector searches happen here:
+  //   a) checkNewCheckinPattern: queries pgvector for check-ins with similar embeddings.
+  //      If 3+ neighbors have cosine similarity >= 0.82, returns a detected pattern
+  //      (e.g., "This check-in matches a recurring fatigue pattern from the past 2 weeks")
+  //   b) findRelatedContext: searches both document_chunks and check_ins by embedding
+  //      similarity to find relevant medical history (e.g., matching lab results)
+  //
+  // Both are non-blocking — if RAG fails, the check-in is still saved successfully.
   let pattern = null;
   let relatedContext = null;
   try {
@@ -145,6 +158,8 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
     console.error("[checkin] RAG/pattern check failed (non-blocking):", (err as Error).message);
   }
 
+  // Return the check-in along with any RAG-discovered patterns or related context.
+  // The frontend can display these as "AI Insights" alongside the saved check-in.
   res.status(201).json({
     checkin: data,
     ...(pattern ? { pattern } : {}),
@@ -202,7 +217,14 @@ router.post(
       };
     });
 
-    // Fetch RAG context from vector search for richer conversation
+    // RAG enrichment for voice AI context: use recent check-in summaries as a query
+    // to find relevant medical documents via vector similarity search.
+    // Example: if recent check-ins mention "fatigue" and "dizziness", this might pull
+    // in a blood test document showing low hemoglobin, so the voice AI can say
+    // "You know from their recent blood test that hemoglobin was borderline low."
+    //
+    // We set includeCheckins: false because we already have the raw check-ins above —
+    // we only want to discover related documents the AI might not know about.
     let ragContext: string | undefined;
     try {
       const recentSummaries = checkIns.map((ci) => ci.summary).filter(Boolean).join(". ");
@@ -210,7 +232,7 @@ router.post(
         const related = await findRelatedContext(recentSummaries, user_id, {
           limit: 5,
           includeDocuments: true,
-          includeCheckins: false, // Already have recent check-ins
+          includeCheckins: false,
         });
         if (related.combinedContext) {
           ragContext = related.combinedContext;
@@ -220,6 +242,8 @@ router.post(
       console.error("[summary] RAG context fetch failed (non-blocking):", (err as Error).message);
     }
 
+    // Pass RAG context as second argument — it gets injected into the system prompt
+    // so the voice AI can reference document findings naturally in conversation
     const context = await generateConversationContext(mapped, ragContext);
 
     res.json({
@@ -249,7 +273,9 @@ router.post(
       return;
     }
 
-    // Enrich system prompt with RAG context
+    // RAG enrichment: search for relevant health documents/check-ins and append
+    // them to the system prompt. This lets the AI's opening message reference
+    // specific medical findings (e.g., "I see your recent blood test showed...").
     let enrichedPrompt = systemPrompt;
     try {
       const related = await findRelatedContext("recent health concerns and symptoms", userId, { limit: 3 });
@@ -285,7 +311,10 @@ router.post(
       return;
     }
 
-    // Enrich system prompt with RAG context based on latest user message
+    // Dynamic RAG: use the user's latest message as the vector search query.
+    // This means if the user says "my head hurts", we search for past check-ins
+    // and documents related to headaches and inject them into the system prompt.
+    // Each turn gets fresh context, so the AI can react to new topics.
     let enrichedPrompt = systemPrompt;
     const lastUserMessage = [...history].reverse().find((m) => m.role === "user");
     if (lastUserMessage) {

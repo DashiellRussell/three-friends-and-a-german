@@ -11,6 +11,7 @@ import symptoms from "./routes/symptoms";
 import documents from "./routes/documents";
 import reports from "./routes/reports";
 import voice from "./routes/voice";
+// RAG endpoint: exposes embedding-based health pattern detection to the frontend
 import patterns from "./routes/patterns";
 
 const app = express();
@@ -27,7 +28,7 @@ app.use("/api/symptoms", symptoms);
 app.use("/api/documents", documents);
 app.use("/api/reports", reports);
 app.use("/api/voice", voice);
-app.use("/api/patterns", patterns);
+app.use("/api/patterns", patterns); // NEW: RAG pattern detection endpoint
 
 // Health check
 app.get("/ping", (_req, res) => {

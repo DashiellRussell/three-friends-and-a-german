@@ -1,10 +1,31 @@
+/**
+ * Cross-Reference Service — RAG Retrieval Layer
+ *
+ * This is the core RAG (Retrieval-Augmented Generation) search function.
+ * Given a natural language query, it:
+ *   1. Embeds the query text into a 1024-dim vector via Mistral
+ *   2. Searches both document_chunks AND check_ins tables using pgvector cosine similarity
+ *   3. Merges and formats the results into a text block ready for LLM injection
+ *
+ * The output (`combinedContext`) is a chronologically sorted, human-readable string
+ * that gets injected into system prompts across the app:
+ *   - Voice check-in sessions (signed-url endpoint)
+ *   - Chat conversations (chat/start, chat/message endpoints)
+ *   - Conversation context generation (summary endpoint)
+ *   - Report generation (executive summary prompt)
+ *
+ * This means the AI can reference specific lab results, past symptoms, and document
+ * findings naturally in conversation: "Your blood test from last week showed low
+ * hemoglobin — how's your energy been since then?"
+ */
+
 import { embedText } from "./mistral";
 import { supabase } from "./supabase";
 
 interface DocumentChunkResult {
   content: string;
   document_type: string;
-  similarity: number;
+  similarity: number;       // cosine similarity score from pgvector (0-1)
   created_at: string;
 }
 
@@ -13,26 +34,30 @@ interface CheckInResult {
   transcript: string;
   mood: string;
   energy: number;
-  similarity: number;
+  similarity: number;       // cosine similarity score from pgvector (0-1)
   created_at: string;
 }
 
 export interface RelatedContext {
-  documentChunks: DocumentChunkResult[];
-  checkIns: CheckInResult[];
-  combinedContext: string;
+  documentChunks: DocumentChunkResult[];  // matching document sections
+  checkIns: CheckInResult[];              // matching past check-ins
+  combinedContext: string;                 // formatted text block for LLM injection
 }
 
 interface FindRelatedOptions {
-  limit?: number;
-  includeCheckins?: boolean;
-  includeDocuments?: boolean;
-  threshold?: number;
+  limit?: number;              // max results per source (default 5)
+  includeCheckins?: boolean;   // search check_ins embeddings (default true)
+  includeDocuments?: boolean;  // search document_chunks embeddings (default true)
+  threshold?: number;          // minimum cosine similarity to include (default 0.3)
 }
 
 /**
- * Find related health context by embedding the query and searching
- * both document chunks and check-ins via pgvector similarity.
+ * Main RAG retrieval function — find health context relevant to a query.
+ *
+ * @param queryText - Natural language query (e.g., "headache and fatigue", or a check-in summary)
+ * @param userId - Scopes search to this user's data only
+ * @param options - Control which sources to search and how many results
+ * @returns Related context with raw results + formatted combinedContext string
  */
 export async function findRelatedContext(
   queryText: string,
@@ -43,15 +68,20 @@ export async function findRelatedContext(
     limit = 5,
     includeCheckins = true,
     includeDocuments = true,
-    threshold = 0.3,
+    threshold = 0.3,  // 0.3 is permissive — catches loosely related content
   } = options || {};
 
+  // Step 1: Embed the query text into the same 1024-dim vector space
+  // as our stored documents and check-ins
   const queryEmbedding = await embedText(queryText);
 
   const documentChunks: DocumentChunkResult[] = [];
   const checkIns: CheckInResult[] = [];
 
-  // Fetch matching document chunks
+  // Step 2a: Search document chunks via pgvector similarity
+  // Uses the match_document_chunks() RPC which runs:
+  //   SELECT *, 1 - (embedding <=> query_embedding) AS similarity
+  //   FROM document_chunks WHERE user_id = ... ORDER BY similarity DESC
   if (includeDocuments) {
     try {
       const { data, error } = await supabase.rpc("match_document_chunks", {
@@ -61,10 +91,11 @@ export async function findRelatedContext(
       });
 
       if (!error && data) {
-        // For each chunk, fetch the parent document's type and created_at
         for (const chunk of data) {
+          // Skip low-similarity results that would add noise
           if (chunk.similarity < threshold) continue;
 
+          // Enrich chunk with parent document metadata (type, date)
           const { data: doc } = await supabase
             .from("documents")
             .select("document_type, created_at")
@@ -80,11 +111,13 @@ export async function findRelatedContext(
         }
       }
     } catch (err) {
+      // Non-fatal: RAG enrichment should never block the main flow
       console.error("[crossReference] Document chunk search failed:", (err as Error).message);
     }
   }
 
-  // Fetch matching check-ins
+  // Step 2b: Search check-in embeddings via pgvector similarity
+  // Uses the match_check_ins() RPC — same approach as document chunks
   if (includeCheckins) {
     try {
       const { data, error } = await supabase.rpc("match_check_ins", {
@@ -97,7 +130,7 @@ export async function findRelatedContext(
         for (const ci of data) {
           if (ci.similarity < threshold) continue;
 
-          // Fetch transcript for additional context
+          // Fetch full transcript for richer context (RPC only returns summary)
           const { data: fullCheckin } = await supabase
             .from("check_ins")
             .select("transcript")
@@ -119,14 +152,16 @@ export async function findRelatedContext(
     }
   }
 
-  // Build combined context string for LLM injection
+  // Step 3: Build a combined context string formatted for LLM system prompt injection.
+  // Results are sorted by date (newest first) so the AI can reference them naturally
+  // with phrases like "your recent blood test" or "last week's check-in".
   const contextParts: string[] = [];
 
   if (checkIns.length > 0 || documentChunks.length > 0) {
     contextParts.push("RELEVANT HEALTH HISTORY:");
   }
 
-  // Sort all results by date
+  // Merge both sources into a single chronological list
   const allResults = [
     ...checkIns.map((ci) => ({
       type: "checkin" as const,

@@ -1,9 +1,32 @@
+/**
+ * Demo Data Seed Script — Populates the database with a realistic 21-day health story.
+ *
+ * Creates a patient persona (Amara) with:
+ * - 16 check-ins over 3 weeks (fatigue → anemia diagnosis → iron supplements → migraine)
+ * - 2 medical documents (blood test results, pharmacy prescription)
+ * - Embeddings for every check-in and document (enabling RAG vector search)
+ * - Document chunks for fine-grained retrieval (via documentPipeline.ts)
+ *
+ * This seed data demonstrates the full RAG pipeline:
+ * - Pattern detection finds the recurring headache/fatigue cluster
+ * - Cross-reference search connects symptoms to the blood test results
+ * - Report generation produces a doctor-ready PDF with AI insights
+ *
+ * Usage:
+ *   npx ts-node src/scripts/seed-demo-data.ts                  # create demo user
+ *   npx ts-node src/scripts/seed-demo-data.ts --user-id=UUID   # seed for existing user
+ *   npx ts-node src/scripts/seed-demo-data.ts --clean           # clean before seeding
+ */
+
 import dotenv from "dotenv";
 dotenv.config();
 
 import { supabase } from "../services/supabase";
+// extractCheckinData: Mistral structured extraction (transcript → mood/energy/sleep/symptoms)
+// embedText: Mistral 1024-dim embedding (powers vector search in RAG)
 import { extractCheckinData, embedText } from "../services/mistral";
 import { mistral } from "../services/mistral";
+// processDocument: splits documents into chunks, embeds each chunk, stores in document_chunks
 import { processDocument } from "../services/documentPipeline";
 
 // ── CLI Args ──
@@ -271,12 +294,15 @@ async function main() {
     console.log(`    Transcript: "${transcript.slice(0, 80)}..."`);
     await delay(200);
 
-    // Extract structured data
+    // Mistral structured extraction: transcript → mood, energy, sleep, symptoms, flags
+    // The extracted summary is optimized for embedding quality (concise + semantically dense)
     console.log("    Extracting structured data...");
     const extracted = await extractCheckinData(transcript);
     await delay(200);
 
-    // Embed
+    // Generate 1024-dim vector from the clean summary — this is what powers
+    // pattern detection (clustering similar check-ins) and cross-reference search
+    // (finding check-ins related to a query like "headache" or "fatigue")
     console.log("    Embedding...");
     const embedding = await embedText(extracted.summary);
     await delay(200);
@@ -377,12 +403,14 @@ async function main() {
     const summary = String(summaryResponse.choices?.[0]?.message?.content || "Document uploaded.").trim();
     await delay(200);
 
-    // Embed
+    // Embed the full document text — this coarse-grained vector enables
+    // document-level similarity search. The fine-grained chunk embeddings
+    // (created by processDocument below) enable section-level matching.
     console.log("    Embedding...");
     const embedding = await embedText(docPlan.content);
     await delay(200);
 
-    // Insert document
+    // Insert document record with summary + embedding
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .insert({
@@ -406,7 +434,10 @@ async function main() {
     documentCount++;
     console.log(`    Document created: ${doc.id}`);
 
-    // Run through chunking pipeline
+    // Run the RAG chunking pipeline: splits the document into ~500-token chunks,
+    // embeds each chunk independently, and inserts into document_chunks table.
+    // This enables fine-grained vector search (e.g., finding just the iron studies
+    // section of a blood test when someone searches for "anemia" or "fatigue").
     console.log("    Running document chunking pipeline...");
     try {
       const chunkCount = await processDocument(doc.id, docPlan.content, docPlan.type);
