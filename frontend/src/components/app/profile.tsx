@@ -1,27 +1,27 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
 import { Toggle, Pill, useToast } from "./shared";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 interface Document {
-  id: number;
-  name: string;
-  type: string;
-  date: string;
-  size: string;
-  status: "processed" | "pending" | "failed";
+  id: string;
+  file_name: string;
+  document_type: string;
+  summary: string | null;
+  flagged: boolean;
+  created_at: string;
 }
 
-const MOCK_DOCUMENTS: Document[] = [
-  { id: 1, name: "Blood Work Results — Feb 2026", type: "Lab Report", date: "Feb 15, 2026", size: "1.2 MB", status: "processed" },
-  { id: 2, name: "HbA1c Panel — Jan 2026", type: "Lab Report", date: "Jan 22, 2026", size: "0.8 MB", status: "processed" },
-  { id: 3, name: "GP Visit Summary", type: "Clinical Note", date: "Jan 10, 2026", size: "0.4 MB", status: "processed" },
-  { id: 4, name: "Prescription — Metformin", type: "Prescription", date: "Dec 5, 2025", size: "0.2 MB", status: "processed" },
-  { id: 5, name: "Vitamin D Lab Panel", type: "Lab Report", date: "Nov 18, 2025", size: "0.6 MB", status: "pending" },
-];
+const DOC_TYPE_LABELS: Record<string, string> = {
+  lab_report: "Lab Report",
+  prescription: "Prescription",
+  imaging: "Imaging",
+  discharge_summary: "Clinical Note",
+  other: "Document",
+};
 
 const DOC_ICONS: Record<string, string> = {
   "Lab Report": "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
@@ -40,9 +40,23 @@ export function Profile() {
   const [n2, setN2] = useState(true);
   const [n3, setN3] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(true);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [docsLoading, setDocsLoading] = useState(true);
   const [callStatus, setCallStatus] = useState<"idle" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState<string | null>(null);
   const { show: showToast, ToastEl } = useToast();
+
+  useEffect(() => {
+    if (!user) return;
+    setDocsLoading(true);
+    fetch(`${BACKEND_URL}/api/documents`, {
+      headers: { "x-user-id": user.id },
+    })
+      .then((res) => res.json())
+      .then((data) => setDocuments(Array.isArray(data) ? data : data.documents || []))
+      .catch(console.error)
+      .finally(() => setDocsLoading(false));
+  }, [user]);
 
   const triggerCall = useCallback(async () => {
     if (!user) return;
@@ -131,9 +145,11 @@ export function Profile() {
             <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
               Documents
             </span>
-            <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-500">
-              {MOCK_DOCUMENTS.length}
-            </span>
+            {!docsLoading && (
+              <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-500">
+                {documents.length}
+              </span>
+            )}
           </div>
           <svg
             width="14"
@@ -151,46 +167,63 @@ export function Profile() {
 
         {docsExpanded && (
           <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white">
-            {MOCK_DOCUMENTS.map((doc, i) => (
-              <button
-                key={doc.id}
-                className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 ${
-                  i < MOCK_DOCUMENTS.length - 1 ? "border-b border-zinc-50" : ""
-                }`}
-              >
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#71717a"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            {docsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-600" />
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[13px] text-zinc-400">
+                No documents uploaded yet
+              </div>
+            ) : (
+              documents.map((doc, i) => {
+                const typeLabel = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
+                const dateStr = new Date(doc.created_at).toLocaleDateString("en-AU", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                const hasAnalysis = !!doc.summary;
+                return (
+                  <button
+                    key={doc.id}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 ${
+                      i < documents.length - 1 ? "border-b border-zinc-50" : ""
+                    }`}
                   >
-                    <path d={DOC_ICONS[doc.type] || DOC_ICONS["Lab Report"]} />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate text-[13px] font-medium text-zinc-900">
-                    {doc.name}
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-400">
-                    <span>{doc.type}</span>
-                    <span className="text-zinc-200">·</span>
-                    <span>{doc.date}</span>
-                    <span className="text-zinc-200">·</span>
-                    <span>{doc.size}</span>
-                  </div>
-                </div>
-                <div className="mt-1 shrink-0">
-                  <Pill variant={doc.status === "processed" ? "good" : doc.status === "pending" ? "warn" : "bad"}>
-                    {doc.status === "processed" ? "Analysed" : doc.status === "pending" ? "Pending" : "Failed"}
-                  </Pill>
-                </div>
-              </button>
-            ))}
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#71717a"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d={DOC_ICONS[typeLabel] || DOC_ICONS["Lab Report"]} />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate text-[13px] font-medium text-zinc-900">
+                        {doc.file_name}
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-400">
+                        <span>{typeLabel}</span>
+                        <span className="text-zinc-200">·</span>
+                        <span>{dateStr}</span>
+                      </div>
+                    </div>
+                    <div className="mt-1 shrink-0">
+                      <Pill variant={hasAnalysis ? "good" : "warn"}>
+                        {hasAnalysis ? "Analysed" : "Pending"}
+                      </Pill>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         )}
       </div>
