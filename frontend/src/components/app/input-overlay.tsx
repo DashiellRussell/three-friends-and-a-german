@@ -7,6 +7,7 @@ import { generateTestReport } from "@/lib/generate-test-report";
 import { Pill } from "./shared";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const DEV_USER_ID = "10fef350-acb9-48e8-aa79-fef974a40e5b";
 
 type Mode = null | "voice" | "chat" | "upload";
 type TranscriptMsg = { role: "user" | "agent"; text: string };
@@ -101,7 +102,7 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/voice/signed-url`, {
-        headers: { "x-user-id": "dev-user" },
+        headers: { "x-user-id": DEV_USER_ID },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -132,7 +133,7 @@ export function InputOverlay({ onClose }: { onClose: () => void }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": "dev-user",
+          "x-user-id": DEV_USER_ID,
         },
         body: JSON.stringify({
           input_mode: "voice",
