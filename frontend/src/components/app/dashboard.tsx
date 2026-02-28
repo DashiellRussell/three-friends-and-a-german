@@ -1,8 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { CHECKINS } from "@/lib/mock-data";
 import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
+
+interface CriticalAlert {
+  id: string;
+  name: string;
+  severity: number;
+  created_at: string;
+}
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -23,18 +31,125 @@ export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
   const { user } = useUser();
   const last7 = CHECKINS.slice(0, 7).reverse();
   const firstName = user?.display_name?.split(" ")[0] || "there";
+  const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user.id } })
+      .then(res => res.json())
+      .then(data => setAlerts(data.alerts || []))
+      .catch(console.error);
+  }, [user, backendUrl]);
+
+  function dismiss(id: string) {
+    fetch(`${backendUrl}/api/symptoms/${id}/dismiss`, {
+      method: "PATCH",
+      headers: { "x-user-id": user!.id },
+    })
+      .then(() => setAlerts(prev => prev.filter(a => a.id !== id)))
+      .catch(console.error);
+  }
+
+  function undismissAll() {
+    fetch(`${backendUrl}/api/symptoms/undismiss-critical`, {
+      method: "POST",
+      headers: { "x-user-id": user!.id },
+    })
+      .then(() =>
+        fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user!.id } })
+          .then(res => res.json())
+          .then(data => setAlerts(data.alerts || []))
+      )
+      .catch(console.error);
+  }
 
   return (
     <div className="px-5 pt-8 pb-25">
       {/* Greeting */}
-      <div className="mb-8">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-          {formatDate()}
-        </p>
-        <h1 className="mt-1.5 text-[28px] font-semibold tracking-tight text-zinc-900 leading-tight">
-          {getGreeting()}, {firstName}
-        </h1>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+            {formatDate()}
+          </p>
+          <h1 className="mt-1.5 text-[28px] font-semibold tracking-tight text-zinc-900 leading-tight">
+            {getGreeting()}, {firstName}
+          </h1>
+        </div>
+
+        {/* Alert bell */}
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white transition-all hover:border-zinc-300 hover:shadow-sm"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {alerts.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+              {alerts.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* Critical alerts panel */}
+      {panelOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanelOpen(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-107.5 rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-xl" style={{ animation: "slideUp 0.25s" }}>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-[16px] font-semibold text-zinc-900">Critical Alerts</h3>
+                <p className="text-[12px] text-zinc-400">{alerts.length} active</p>
+              </div>
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100"
+              >
+                ✕
+              </button>
+            </div>
+            {alerts.length === 0 ? (
+              <div className="py-8 text-center text-sm text-zinc-400">No critical alerts</div>
+            ) : (
+              <div className="flex max-h-72 flex-col gap-2.5 overflow-y-auto">
+                {alerts.map(alert => (
+                  <div key={alert.id} className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-3.5">
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-medium text-zinc-900">{alert.name}</div>
+                      <div className="mt-0.5 text-[11px] text-zinc-400">
+                        Severity {alert.severity}/10 · {new Date(alert.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => dismiss(alert.id)}
+                      className="shrink-0 text-[11px] font-medium text-zinc-400 hover:text-zinc-600"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-[10px] text-zinc-300">
+                Not medical advice. Always consult a healthcare professional.
+              </p>
+              <button
+                onClick={undismissAll}
+                className="shrink-0 text-[10px] font-medium text-zinc-400 underline hover:text-zinc-600"
+              >
+                Reset for testing
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
 
       {/* Alert card */}
       <button
