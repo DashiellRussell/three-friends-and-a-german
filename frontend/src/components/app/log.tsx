@@ -17,6 +17,7 @@ export function Log() {
   // Data states
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
@@ -33,6 +34,12 @@ export function Log() {
     fetch(`${backendUrl}/api/reports`, { headers: { "x-user-id": user.id } })
       .then(res => res.json())
       .then(data => setReports(data.reports || []))
+      .catch(console.error);
+
+    // Fetch user documents
+    fetch(`${backendUrl}/api/documents`, { headers: { "x-user-id": user.id } })
+      .then(res => res.json())
+      .then(data => setDocuments(Array.isArray(data) ? data : (data.documents || [])))
       .catch(console.error);
   }, [user, view, backendUrl]);
 
@@ -93,7 +100,7 @@ export function Log() {
       </div>
 
       {tab === "log" && <LogTab checkIns={checkIns} expanded={expanded} toggle={toggle} />}
-      {tab === "files" && <FilesTab />}
+      {tab === "files" && <FilesTab documents={documents} />}
       {tab === "reports" && <ReportsTab reports={reports} />}
     </div>
   );

@@ -3,6 +3,8 @@ import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { generateReport } from "../services/generateReport";
 
+const REPORT_BUCKET = "report-pdfs";
+
 const router = Router();
 router.use(requireAuth);
 
@@ -93,10 +95,10 @@ router.get("/generate", async (req: Request, res: Response) => {
 
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (private bucket)
     const fileName = `${userId}/${timeRange}_${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage
-      .from("reports")
+      .from(REPORT_BUCKET)
       .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
@@ -104,9 +106,29 @@ router.get("/generate", async (req: Request, res: Response) => {
 
     if (uploadError) {
       console.error("Failed to upload report to storage:", uploadError);
+      // Still return the PDF inline but mark the DB record as failed
+      await supabase.from("reports").insert({
+        user_id: userId,
+        date_from: startDate.toISOString().split('T')[0],
+        date_to: endDate.toISOString().split('T')[0],
+        detail_level: detailLevel,
+        include_sections: {
+          checkins: req.query.checkins === "true",
+          docs: req.query.docs === "true",
+          meds: req.query.meds === "true",
+          symptoms: req.query.symptoms === "true",
+          trends: req.query.trends === "true",
+        },
+        status: "failed",
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename=report_${timeRange}.pdf`);
+      res.send(pdfBuffer);
+      return;
     }
 
-    // Insert record into reports table
+    // Insert record into reports table only on successful upload
     const { error: dbError } = await supabase
       .from("reports")
       .insert({
@@ -138,6 +160,39 @@ router.get("/generate", async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message, stack: err.stack });
     return;
   }
+});
+
+// GET /api/reports/:id/download — download report PDF via signed URL
+router.get("/:id/download", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  const { data: report, error } = await supabase
+    .from("reports")
+    .select("content_path, status")
+    .eq("id", req.params.id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    res.status(error.code === "PGRST116" ? 404 : 500).json({ error: error.message });
+    return;
+  }
+
+  if (!report.content_path || report.status !== "completed") {
+    res.status(404).json({ error: "Report PDF not available" });
+    return;
+  }
+
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from(REPORT_BUCKET)
+    .createSignedUrl(report.content_path, 3600); // 1 hour expiry
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    res.status(500).json({ error: "Failed to generate download URL" });
+    return;
+  }
+
+  res.json({ url: signedUrlData.signedUrl });
 });
 
 // GET /api/reports/:id — single report with full content

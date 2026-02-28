@@ -25,5 +25,7 @@ export interface Document {
     id: string;
     file_name: string;
     document_type: string;
+    summary: string | null;
+    flagged: boolean;
     created_at: string;
 }
