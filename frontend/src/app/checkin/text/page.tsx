@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
 
@@ -34,9 +35,36 @@ export default function TextCheckinPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
 
+  const [isDone, setIsDone] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [systemContext, setSystemContext] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const router = useRouter();
+
+  const handleDone = async () => {
+    if (messages.length === 0) {
+      router.push("/demo");
+      return;
+    }
+
+    setIsSaving(true);
+
+    const transcript = messages
+      .map((m) => `${m.role === "assistant" ? "AI" : "User"}: ${m.text}`)
+      .join("\n");
+
+    await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/checkin`, {
+      transcript,
+      user_id: "51b5ade8-77df-4379-95f5-404685a44980",
+    });
+
+    setIsSaving(false);
+    setIsDone(true);
+    setTimeout(() => router.push("/demo"), 1500);
+  };
 
   useEffect(() => {
     const loadContext = async () => {
@@ -123,12 +151,13 @@ export default function TextCheckinPage() {
             Text Check-in
           </span>
         </div>
-        <Link
-          href="/demo"
-          className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+        <button
+          onClick={handleDone}
+          disabled={isSaving || isDone}
+          className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Done
-        </Link>
+        </button>
       </div>
 
       {/* Messages */}
@@ -224,6 +253,47 @@ export default function TextCheckinPage() {
           </svg>
         </button>
       </div>
+
+      {isSaving && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm"
+          style={{ animation: "fadeIn 0.2s ease" }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="h-8 w-8 rounded-full border-2 border-zinc-200 border-t-zinc-900"
+              style={{ animation: "spin 0.7s linear infinite" }}
+            />
+            <span className="text-[13px] text-zinc-400">Saving check-in…</span>
+          </div>
+        </div>
+      )}
+
+      {isDone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div
+            style={{ animation: "fadeUp 0.3s ease" }}
+            className="flex flex-col items-center gap-3"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <span className="text-[15px] font-medium text-zinc-900">
+              Check-in saved
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
