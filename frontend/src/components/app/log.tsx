@@ -1,18 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/lib/user-context";
 import { CheckIn, Report, Document } from "./types";
 import { ReportConfig, GeneratingView, ReportSuccessView } from "./report-config";
 import { LogTab } from "./log-tab";
 import { FilesTab } from "./files-tab";
 import { ReportsTab } from "./reports-tab";
+import { CheckInDetail } from "./checkin-detail";
 
+<<<<<<< HEAD
 export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: string | null; onTargetConsumed?: () => void }) {
+=======
+export function Log({ initialSubTab }: { initialSubTab?: "log" | "files" | "reports" }) {
+>>>>>>> 203e1cc95139740596547a19078857ea538774da
   const { user } = useUser();
-  const [tab, setTab] = useState<"log" | "files" | "reports">("log");
+  const [tab, setTab] = useState<"log" | "files" | "reports">(initialSubTab || "log");
   const [expanded, setExpanded] = useState<number | string | null>(null);
   const [view, setView] = useState<"entries" | "report-config" | "generating" | "report">("entries");
+  const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
+
+  // Sync subtab when navigated to from outside (e.g. after upload)
+  useEffect(() => {
+    if (initialSubTab) setTab(initialSubTab);
+  }, [initialSubTab]);
 
   // Data states
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
@@ -58,6 +69,19 @@ export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: s
 
   const toggle = (id: number | string) => setExpanded(expanded === id ? null : id);
 
+  const refetchDocuments = useCallback(() => {
+    if (!user) return;
+    fetch(`${backendUrl}/api/documents`, { headers: { "x-user-id": user.id } })
+      .then(res => res.json())
+      .then(data => setDocuments(Array.isArray(data) ? data : (data.documents || [])))
+      .catch(console.error);
+  }, [user, backendUrl]);
+
+  // Detail view
+  if (selectedCheckIn) {
+    return <CheckInDetail checkIn={selectedCheckIn} onBack={() => setSelectedCheckIn(null)} />;
+  }
+
   if (view === "report-config") {
     return <ReportConfig setView={setView} userId={user?.id || ""} />;
   }
@@ -79,7 +103,7 @@ export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: s
         </div>
         <button
           onClick={() => setView("report-config")}
-          className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-medium text-zinc-900 transition-all hover:border-zinc-300 hover:shadow-sm"
+          className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-xs font-medium text-zinc-900 transition-all hover:border-zinc-300 hover:shadow-sm"
         >
           <svg
             width="14"
@@ -112,8 +136,15 @@ export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: s
         ))}
       </div>
 
-      {tab === "log" && <LogTab checkIns={checkIns} expanded={expanded} toggle={toggle} />}
-      {tab === "files" && <FilesTab documents={documents} />}
+      {tab === "log" && (
+        <LogTab
+          checkIns={checkIns}
+          expanded={expanded}
+          toggle={toggle}
+          onViewDetail={(c) => setSelectedCheckIn(c)}
+        />
+      )}
+      {tab === "files" && <FilesTab documents={documents} onDocumentsChanged={refetchDocuments} />}
       {tab === "reports" && <ReportsTab reports={reports} />}
     </div>
   );

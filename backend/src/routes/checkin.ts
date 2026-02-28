@@ -9,6 +9,7 @@ import {
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
+import { chunkAndStoreCheckin } from "../services/chunking";
 
 const router = Router();
 
@@ -129,63 +130,66 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
+  // Step 4: extract + embed + store significant health event chunks (non-blocking)
+  chunkAndStoreCheckin(transcript, data.id, user_id).catch((err) =>
+    console.error("Checkin chunking failed:", err.message),
+  );
+
   res.status(201).json({ checkin: data });
 });
 
-router.post(
-  "/summary",
-  async (req: Request, res: Response) => {
-    const user_id = req.userId!;
+router.post("/summary", async (req: Request, res: Response) => {
+  const user_id = req.userId!;
 
-    // Load last 7 days of check-ins for this user
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // Load last 7 days of check-ins for this user
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data: checkIns, error } = await supabase
-      .from("check_ins")
-      .select(
-        "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
-      )
-      .eq("user_id", user_id)
-      .gte("created_at", sevenDaysAgo.toISOString())
-      .order("created_at", { ascending: true });
+  const { data: checkIns, error } = await supabase
+    .from("check_ins")
+    .select(
+      "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
+    )
+    .eq("user_id", user_id)
+    .gte("created_at", sevenDaysAgo.toISOString())
+    .order("created_at", { ascending: true });
 
-    if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message);
 
-    if (!checkIns || checkIns.length === 0) {
-      res.json({
-        context: null,
-        message: "No check-ins found for the past 7 days",
-      });
-      return;
+  if (!checkIns || checkIns.length === 0) {
+    res.json({
+      context: null,
+      message: "No check-ins found for the past 7 days",
+    });
+    return;
+  }
+
+  // Map each entry to a human-readable date label
+  const now = new Date();
+  const mapped = checkIns.map((entry) => {
+    const entryDate = new Date(entry.created_at);
+    const diffMs = now.getTime() - entryDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    let dateLabel: string;
+    if (diffDays === 0) {
+      dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+    } else if (diffDays === 1) {
+      dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+    } else {
+      dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
     }
 
-    // Map each entry to a human-readable date label
-    const now = new Date();
-    const mapped = checkIns.map((entry) => {
-      const entryDate = new Date(entry.created_at);
-      const diffMs = now.getTime() - entryDate.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return {
+      date: dateLabel,
+      data: entry as CheckInExtraction,
+    };
+  });
 
-      let dateLabel: string;
-      if (diffDays === 0) {
-        dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
-      } else if (diffDays === 1) {
-        dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
-      } else {
-        dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
-      }
+  const context = await generateConversationContext(mapped);
 
-      return {
-        date: dateLabel,
-        data: entry as CheckInExtraction,
-      };
-    });
-
-    const context = await generateConversationContext(mapped);
-
-    res.json({
-      context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
+  res.json({
+    context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
           Give just a quick warm opening greeting, then immediately jump into the health check-in conversation. Follow these rules:
 - Keep every response to 3-4 sentences maximum
 - Follow this agenda in order: energy → mood → sleep hours → any symptoms or notes (optionally food too if it seems relevant)
@@ -193,9 +197,8 @@ router.post(
 - Once all agenda items are covered, wrap up warmly in one sentence
 - Never give medical advice
 - Do not engage in small talk or ask questions outside the agenda until the agenda is fully covered`,
-    });
-  },
-);
+  });
+});
 
 interface ChatStartBody {
   systemPrompt: string;
