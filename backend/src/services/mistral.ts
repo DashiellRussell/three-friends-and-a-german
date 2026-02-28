@@ -125,3 +125,30 @@ Write a system prompt for the conversational AI that will speak with this user r
 
   return content;
 }
+
+export const summarizeDocument = async (text: string): Promise<string> => {
+  const client = getMistral();
+
+  const response = await client.chat.complete({
+    model: "mistral-large-latest",
+    messages: [
+      {
+        role: "system",
+        content: `You are a medical document summarization assistant.
+        
+Given the full text of a medical document, produce a concise summary that captures the key information a patient would want to remember. Focus on symptoms, diagnoses, treatments, and any follow-up instructions. Write in clear, simple language suitable for a general audience. Aim for 3-5 sentences.`,
+      },
+      {
+        role: "user",
+        content: text,
+      },
+    ],
+  });
+
+  const summary = response.choices?.[0]?.message?.content;
+  if (!summary || typeof summary !== "string")
+    throw new Error("Mistral returned no summary");
+
+  return summary;
+};
+

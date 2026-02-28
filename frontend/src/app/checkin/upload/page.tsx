@@ -2,8 +2,33 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-
+import axios from "axios";
 type UploadStage = "idle" | "uploading" | "processing" | "done";
+
+async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.mjs",
+    import.meta.url,
+  ).toString();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  const pageTexts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ");
+    pageTexts.push(pageText);
+  }
+
+  return pageTexts.join("\n");
+}
+
+
 
 export default function UploadCheckinPage() {
   const [stage, setStage] = useState<UploadStage>("idle");
@@ -14,34 +39,58 @@ export default function UploadCheckinPage() {
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (file: File) => {
+
+  //Axios stage
+
+  
+
+  const handleFileSelect = async (file: File): Promise<string> => {
     setFileName(file.name);
     setStage("uploading");
     setProgress(0);
 
-    // TODO: Upload file to backend via POST /api/documents
-    // Use FormData with multer on the backend.
-    // Track upload progress via XMLHttpRequest or fetch stream.
-    // On upload complete, set stage to "processing".
-    // When backend returns analysis results, set stage to "done" and populate results.
-
-    // Simulating progress for now until backend integration is wired up:
+    // Animate progress bar while extraction runs (caps at 90% until done)
     const iv = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(iv);
-          setStage("processing");
-          return 100;
-        }
-        return p + 10;
-      });
+      setProgress((p) => (p >= 90 ? 90 : p + 10));
     }, 70);
+
+    let text = "";
+    if (file.type === "application/pdf") {
+      text = await extractPdfText(file);
+      console.log("PDF text:", text);
+    }
+
+    clearInterval(iv);
+    setProgress(100);
+    setTimeout(() => setStage("processing"), 150);
+    return text;
   };
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
+    if (!file) return;
+
+    const text = await handleFileSelect(file);
+
+    try {
+      const { data } = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/documents/upload`,
+        { document_text: text },
+        { headers: { "x-user-id": "51b5ade8-77df-4379-95f5-404685a44980" } },
+      );
+      setStatus("✅ success: " + JSON.stringify(data));
+    } catch (e) {
+      setStatus("❌ " + String(e));
+    }
   };
+
+  //Axios 
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function handleClick(text: string) {
+    setStatus("loading...");
+    
+  }
 
   return (
     <div className="fixed inset-0 z-100 flex flex-col bg-[#fafafa]">
