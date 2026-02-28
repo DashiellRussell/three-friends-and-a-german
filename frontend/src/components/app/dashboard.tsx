@@ -19,7 +19,7 @@ function formatDate(): string {
   });
 }
 
-export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void; onStartVoice?: () => void }) {
+export function Dashboard({ goTo }: { goTo: (tab: string) => void }) {
   const { user } = useUser();
   const last7 = CHECKINS.slice(0, 7).reverse();
   const firstName = user?.display_name?.split(" ")[0] || "there";
@@ -35,26 +35,6 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
           {getGreeting()}, {firstName}
         </h1>
       </div>
-
-      {/* Daily check-in CTA */}
-      <button
-        onClick={onStartVoice}
-        className="mb-6 flex w-full items-center gap-4 rounded-2xl bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800 active:scale-[0.99]"
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <div className="text-[15px] font-semibold text-white">Start daily check-in</div>
-          <div className="mt-0.5 text-xs text-white/50">~2 min voice conversation with Kira</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-      </button>
 
       {/* Alert card */}
       <button

@@ -144,7 +144,7 @@ function DemoApp() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => { setVoiceMode(true); setInputOpen(true); }} />}
+        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} />}
         {tab === "log" && <Log />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
