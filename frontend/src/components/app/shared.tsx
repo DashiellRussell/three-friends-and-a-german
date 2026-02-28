@@ -103,11 +103,10 @@ export function SegmentedControl({
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all ${
-            value === o.value
+          className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all ${value === o.value
               ? "bg-white text-zinc-900 shadow-sm"
               : "text-zinc-400 hover:text-zinc-600"
-          }`}
+            }`}
         >
           {o.label}
         </button>
@@ -157,9 +156,8 @@ export function Toast({
 }) {
   return (
     <div
-      className={`pointer-events-none fixed left-1/2 top-5 z-[200] -translate-x-1/2 transition-all duration-300 ${
-        visible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
-      }`}
+      className={`pointer-events-none fixed left-1/2 top-5 z-[200] -translate-x-1/2 transition-all duration-300 ${visible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
+        }`}
     >
       <div className={`flex items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg shadow-black/5 backdrop-blur-lg ${TOAST_STYLES[variant]}`}>
         <div className="shrink-0">{TOAST_ICONS[variant]}</div>
@@ -208,9 +206,38 @@ export function Sparkline({
   labels?: string[];
   highlight?: number;
 }) {
+  if (!data || data.length === 0) return null;
+
   const w = 280;
   const h = height;
   const pad = 4;
+
+  if (data.length === 1) {
+    const px = w / 2;
+    const py = h / 2;
+    return (
+      <div className="relative">
+        <svg width="100%" viewBox={`0 0 ${w} ${h}`} className="block">
+          <circle
+            cx={px}
+            cy={py}
+            r={highlight === 0 ? 4 : 2.5}
+            fill={highlight === 0 ? color : "#fff"}
+            stroke={color}
+            strokeWidth={highlight === 0 ? 2 : 1.5}
+          />
+        </svg>
+        {labels && labels.length > 0 && (
+          <div className="flex justify-center px-1 pt-1.5">
+            <span className="text-[9px] text-zinc-300">
+              {labels[0]}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const min = Math.min(...data) - 0.5;
   const max = Math.max(...data) + 0.5;
   const pts = data.map((v, i) => ({
