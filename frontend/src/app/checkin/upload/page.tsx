@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { useUser } from "@/lib/user-context";
-type UploadStage = "idle" | "uploading" | "processing" | "done";
+type UploadStage = "idle" | "uploading" | "processing";
 
 async function extractPdfText(file: File): Promise<string> {
   const pdfjsLib = await import("pdfjs-dist");
@@ -36,9 +36,6 @@ export default function UploadCheckinPage() {
   const [stage, setStage] = useState<UploadStage>("idle");
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState("");
-  const [results, setResults] = useState<
-    { metric: string; value: string; status: string }[]
-  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -86,8 +83,12 @@ export default function UploadCheckinPage() {
         { headers: { "x-user-id": user?.id || "" } },
       );
       setStatus("✅ success: " + JSON.stringify(data));
+      setStage("idle");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e) {
       setStatus("❌ " + String(e));
+      setStage("idle");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -198,51 +199,6 @@ export default function UploadCheckinPage() {
             <div className="mt-4 text-xs text-zinc-400">
               Extracting findings…
             </div>
-          </div>
-        )}
-
-        {stage === "done" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div className="mb-4 flex items-center gap-2">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#16a34a"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span className="text-[13px] font-medium text-zinc-900">
-                Processed
-              </span>
-            </div>
-            {results.map((r, i) => (
-              <div
-                key={i}
-                className="mb-2 flex items-center justify-between rounded-2xl border border-zinc-100 bg-white px-4 py-3"
-              >
-                <span className="text-[13px] text-zinc-700">
-                  <span className="font-medium">{r.metric}</span>{" "}
-                  <span className="text-zinc-400">{r.value}</span>
-                </span>
-                <span
-                  className={`inline-block whitespace-nowrap rounded-lg px-2.5 py-1 text-[10px] font-medium tracking-wide ${
-                    r.status === "normal"
-                      ? "bg-emerald-50 text-emerald-600"
-                      : r.status === "elevated"
-                        ? "bg-red-50 text-red-600"
-                        : r.status === "low"
-                          ? "bg-amber-50 text-amber-600"
-                          : "bg-zinc-100 text-zinc-500"
-                  }`}
-                >
-                  {r.status}
-                </span>
-              </div>
-            ))}
           </div>
         )}
       </div>
