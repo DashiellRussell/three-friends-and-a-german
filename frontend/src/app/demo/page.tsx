@@ -99,11 +99,8 @@ function LoginScreen() {
 function DemoApp() {
   const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("dashboard");
-<<<<<<< HEAD
   const [targetCheckinId, setTargetCheckinId] = useState<string | null>(null);
-=======
   const [logSubTab, setLogSubTab] = useState<"log" | "files" | "reports" | undefined>(undefined);
->>>>>>> 203e1cc95139740596547a19078857ea538774da
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [callMode, setCallMode] = useState(false);
@@ -149,13 +146,8 @@ function DemoApp() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-<<<<<<< HEAD
         {tab === "dashboard" && <Dashboard goTo={(t, checkinId) => { setTab(t as Tab); setTargetCheckinId(checkinId ?? null); }} />}
-        {tab === "log" && <Log targetCheckinId={targetCheckinId} onTargetConsumed={() => setTargetCheckinId(null)} />}
-=======
-        {tab === "dashboard" && <Dashboard goTo={(t) => setTab(t as Tab)} onStartVoice={() => { setVoiceMode(true); setInputOpen(true); }} />}
-        {tab === "log" && <Log initialSubTab={logSubTab} />}
->>>>>>> 203e1cc95139740596547a19078857ea538774da
+        {tab === "log" && <Log targetCheckinId={targetCheckinId} onTargetConsumed={() => setTargetCheckinId(null)} initialSubTab={logSubTab} />}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
       </div>

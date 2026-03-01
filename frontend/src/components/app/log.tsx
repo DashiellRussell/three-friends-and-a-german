@@ -9,11 +9,7 @@ import { FilesTab } from "./files-tab";
 import { ReportsTab } from "./reports-tab";
 import { CheckInDetail } from "./checkin-detail";
 
-<<<<<<< HEAD
-export function Log({ targetCheckinId, onTargetConsumed }: { targetCheckinId?: string | null; onTargetConsumed?: () => void }) {
-=======
-export function Log({ initialSubTab }: { initialSubTab?: "log" | "files" | "reports" }) {
->>>>>>> 203e1cc95139740596547a19078857ea538774da
+export function Log({ targetCheckinId, onTargetConsumed, initialSubTab }: { targetCheckinId?: string | null; onTargetConsumed?: () => void; initialSubTab?: "log" | "files" | "reports" }) {
   const { user } = useUser();
   const [tab, setTab] = useState<"log" | "files" | "reports">(initialSubTab || "log");
   const [expanded, setExpanded] = useState<number | string | null>(null);

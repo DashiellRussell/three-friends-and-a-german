@@ -37,13 +37,8 @@ export function LogTab({ checkIns, expanded, toggle, onViewDetail }: LogTabProps
                 return (
                     <div
                         key={c.id}
-<<<<<<< HEAD
                         id={`checkin-${c.id}`}
-                        onClick={() => toggle(c.id)}
-                        className={`w-full rounded-2xl bg-white p-4 text-left transition-all hover:shadow-sm ${c.flagged ? "border border-amber-200/80 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
-=======
                         className={`w-full rounded-lg bg-white text-left transition-all ${c.flagged ? "border border-amber-200 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
->>>>>>> 203e1cc95139740596547a19078857ea538774da
                     >
                         <button
                             onClick={() => toggle(c.id)}
