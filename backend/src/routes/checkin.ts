@@ -37,6 +37,108 @@ router.get("/", async (req: Request, res: Response) => {
   res.json(data);
 });
 
+// Symptom network graph — cosine similarity between checkin_chunks embeddings
+router.get("/graph", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  const { data: chunks, error } = await supabase
+    .from("checkin_chunks")
+    .select("id, check_in_id, content, embedding, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  if (!chunks || chunks.length === 0) {
+    res.json({ nodes: [], links: [] });
+    return;
+  }
+
+  // Parse embeddings (Supabase returns vector columns as strings)
+  const embeddings: number[][] = chunks.map((c) => {
+    if (typeof c.embedding === "string") return JSON.parse(c.embedding);
+    return c.embedding as number[];
+  });
+
+  // Cosine similarity
+  function cosineSim(a: number[], b: number[]): number {
+    let dot = 0,
+      normA = 0,
+      normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  // Extract short label + category from content
+  function categorize(content: string): { label: string; category: string } {
+    const l = content.toLowerCase();
+    if (/headache|migraine/.test(l)) return { label: "Headache", category: "neurological" };
+    if (/dizz|vertigo/.test(l)) return { label: "Dizziness", category: "neurological" };
+    if (/visual|zigzag|stars|eye/.test(l)) return { label: "Visual disturbance", category: "neurological" };
+    if (/tremor|shak/.test(l)) return { label: "Tremors", category: "neurological" };
+    if (/stomach|digestive|cramp/.test(l)) return { label: "Stomach issues", category: "gastrointestinal" };
+    if (/chest|breath|respiratory|lung/.test(l)) return { label: "Chest / breathing", category: "respiratory" };
+    if (/fatigue|heav[iy]|tired|slug|weakness|mobility|labored/.test(l)) return { label: "Fatigue", category: "musculoskeletal" };
+    if (/medic|pill|drug|iron|inhaler|prescrip/.test(l)) return { label: "Medication", category: "medication" };
+    if (/fall|injur|hurt|twist/.test(l)) return { label: "Injury", category: "musculoskeletal" };
+    if (/blood|oxygen|nutrient|anemi/.test(l)) return { label: "Blood issues", category: "cardiovascular" };
+    if (/test|clinic|doctor|nurse|visit/.test(l)) return { label: "Medical visit", category: "medical" };
+    return { label: content.split(" ").slice(1, 4).join(" "), category: "other" };
+  }
+
+  const LINK_THRESHOLD = 0.83;
+  const COMMONALITY_THRESHOLD = 0.88;
+
+  // Pre-compute full similarity matrix
+  const simMatrix: number[][] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    simMatrix[i] = [];
+    for (let j = 0; j < chunks.length; j++) {
+      simMatrix[i][j] = i === j ? 1 : (j < i ? simMatrix[j][i] : cosineSim(embeddings[i], embeddings[j]));
+    }
+  }
+
+  // Build links (pairs above threshold)
+  const links: { source: string; target: string; similarity: number }[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    for (let j = i + 1; j < chunks.length; j++) {
+      if (simMatrix[i][j] > LINK_THRESHOLD) {
+        links.push({
+          source: chunks[i].id,
+          target: chunks[j].id,
+          similarity: Math.round(simMatrix[i][j] * 1000) / 1000,
+        });
+      }
+    }
+  }
+
+  // Commonality = how many other nodes have high similarity to this one
+  const nodes = chunks.map((c, i) => {
+    const { label, category } = categorize(c.content);
+    let commonality = 0;
+    for (let j = 0; j < chunks.length; j++) {
+      if (i !== j && simMatrix[i][j] > COMMONALITY_THRESHOLD) commonality++;
+    }
+    return {
+      id: c.id,
+      label,
+      category,
+      content: c.content,
+      commonality,
+      check_in_id: c.check_in_id,
+      created_at: c.created_at,
+    };
+  });
+
+  res.json({ nodes, links });
+});
+
 // Dashboard stats summary — must be before /:id to avoid matching "stats" as an id
 router.get("/stats/summary", async (req: Request, res: Response) => {
   const userId = req.userId!;

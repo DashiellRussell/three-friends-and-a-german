@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CHECKINS, MOOD_MAP } from "@/lib/mock-data";
 import { SegmentedControl, Sparkline } from "./shared";
+import { SymptomGraph } from "./symptom-graph";
 
 export function Trends() {
   const [range, setRange] = useState("week");
@@ -174,7 +175,7 @@ export function Trends() {
       </div>
 
       {/* AI Insight */}
-      <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
+      <div className="mb-3 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
         <div className="mb-2 flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
           <span className="text-xs font-semibold text-sky-700">AI Insight</span>
@@ -183,6 +184,9 @@ export function Trends() {
           Your energy dips correlate with nights under 6 hours sleep. Feb 27 shows the lowest energy (5/10) following 5 hours sleep, combined with missed Vitamin D and new symptoms (thirst, fatigue) that may relate to your elevated HbA1c.
         </p>
       </div>
+
+      {/* Symptom Network Graph */}
+      <SymptomGraph />
     </div>
   );
 }

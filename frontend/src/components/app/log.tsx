@@ -9,7 +9,7 @@ import { FilesTab } from "./files-tab";
 import { ReportsTab } from "./reports-tab";
 import { CheckInDetail } from "./checkin-detail";
 
-export function Log({ initialSubTab }: { initialSubTab?: "log" | "files" | "reports" }) {
+export function Log({ targetCheckinId, onTargetConsumed, initialSubTab }: { targetCheckinId?: string | null; onTargetConsumed?: () => void; initialSubTab?: "log" | "files" | "reports" }) {
   const { user } = useUser();
   const [tab, setTab] = useState<"log" | "files" | "reports">(initialSubTab || "log");
   const [expanded, setExpanded] = useState<number | string | null>(null);
@@ -50,6 +50,19 @@ export function Log({ initialSubTab }: { initialSubTab?: "log" | "files" | "repo
       .catch(console.error);
   }, [user, view, backendUrl]);
 
+  useEffect(() => {
+    if (!targetCheckinId || checkIns.length === 0) return;
+    const match = checkIns.find(c => c.id === targetCheckinId);
+    if (match) {
+      setTab("log");
+      setExpanded(match.id);
+      onTargetConsumed?.();
+      setTimeout(() => {
+        document.getElementById(`checkin-${match.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  }, [targetCheckinId, checkIns]);
+
   const toggle = (id: number | string) => setExpanded(expanded === id ? null : id);
 
   const refetchDocuments = useCallback(() => {
@@ -78,7 +91,7 @@ export function Log({ initialSubTab }: { initialSubTab?: "log" | "files" | "repo
   }
 
   return (
-    <div className="px-5 pt-8 pb-[100px]">
+    <div className="px-5 pt-8 pb-25">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900">Health Data</h2>

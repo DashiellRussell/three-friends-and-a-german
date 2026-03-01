@@ -54,6 +54,25 @@ router.get("/alerts", async (req: Request, res: Response) => {
   res.json({ alerts: data });
 });
 
+// POST /api/symptoms/undismiss-critical — restore all dismissed critical alerts (testing only)
+router.post("/undismiss-critical", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  const { data, error } = await supabase
+    .from("symptoms")
+    .update({ dismissed: false })
+    .eq("user_id", userId)
+    .eq("is_critical", true)
+    .eq("dismissed", true)
+    .select();
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  res.json({ restored: data?.length ?? 0 });
+});
+
 // PATCH /api/symptoms/:id/dismiss — dismiss an alert
 router.patch("/:id/dismiss", async (req: Request, res: Response) => {
   const userId = req.userId!;

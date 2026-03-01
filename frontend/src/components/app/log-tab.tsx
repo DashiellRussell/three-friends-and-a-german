@@ -37,6 +37,7 @@ export function LogTab({ checkIns, expanded, toggle, onViewDetail }: LogTabProps
                 return (
                     <div
                         key={c.id}
+                        id={`checkin-${c.id}`}
                         className={`w-full rounded-lg bg-white text-left transition-all ${c.flagged ? "border border-amber-200 hover:border-amber-300" : "border border-zinc-100 hover:border-zinc-200"}`}
                     >
                         <button

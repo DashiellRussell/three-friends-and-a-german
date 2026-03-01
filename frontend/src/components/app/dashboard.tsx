@@ -6,6 +6,14 @@ import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
 import { ActivityGrid } from "./activity-grid";
 
+interface CriticalAlert {
+  id: string;
+  name: string;
+  severity: number;
+  created_at: string;
+  check_in_id: string | null;
+}
+
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -21,9 +29,42 @@ function formatDate(): string {
   });
 }
 
-export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void; onStartVoice?: () => void }) {
+export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) => void }) {
   const { user } = useUser();
   const firstName = user?.display_name?.split(" ")[0] || "there";
+  const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user.id } })
+      .then(res => res.json())
+      .then(data => setAlerts(data.alerts || []))
+      .catch(console.error);
+  }, [user, backendUrl]);
+
+  function dismiss(id: string) {
+    fetch(`${backendUrl}/api/symptoms/${id}/dismiss`, {
+      method: "PATCH",
+      headers: { "x-user-id": user!.id },
+    })
+      .then(() => setAlerts(prev => prev.filter(a => a.id !== id)))
+      .catch(console.error);
+  }
+
+  function undismissAll() {
+    fetch(`${backendUrl}/api/symptoms/undismiss-critical`, {
+      method: "POST",
+      headers: { "x-user-id": user!.id },
+    })
+      .then(() =>
+        fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user!.id } })
+          .then(res => res.json())
+          .then(data => setAlerts(data.alerts || []))
+      )
+      .catch(console.error);
+  }
 
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,34 +106,99 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
   return (
     <div className="px-5 pt-8 pb-25">
       {/* Greeting */}
-      <div className="mb-8">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-          {formatDate()}
-        </p>
-        <h1 className="mt-1.5 text-[28px] font-semibold tracking-tight text-zinc-900 leading-tight">
-          {getGreeting()}, {firstName}
-        </h1>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+            {formatDate()}
+          </p>
+          <h1 className="mt-1.5 text-[28px] font-semibold tracking-tight text-zinc-900 leading-tight">
+            {getGreeting()}, {firstName}
+          </h1>
+        </div>
+
+        {/* Alert bell */}
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white transition-all hover:border-zinc-300 hover:shadow-sm"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <circle cx="12" cy="15" r="0.5" fill="currentColor" stroke="none" />
+          </svg>
+          {alerts.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+              {alerts.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Daily check-in CTA */}
-      <button
-        onClick={onStartVoice}
-        className="mb-6 flex w-full items-center gap-4 rounded-2xl bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800 active:scale-[0.99]"
-      >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <div className="text-[15px] font-semibold text-white">Start daily check-in</div>
-          <div className="mt-0.5 text-xs text-white/50">~2 min voice conversation with Kira</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-      </button>
+      {/* Critical alerts panel */}
+      {panelOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanelOpen(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-107.5 rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-xl" style={{ animation: "slideUp 0.25s" }}>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-[16px] font-semibold text-zinc-900">Critical Alerts</h3>
+                <p className="text-[12px] text-zinc-400">{alerts.length} active</p>
+              </div>
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100"
+              >
+                ✕
+              </button>
+            </div>
+            {alerts.length === 0 ? (
+              <div className="py-8 text-center text-sm text-zinc-400">No critical alerts</div>
+            ) : (
+              <div className="flex max-h-72 flex-col gap-2.5 overflow-y-auto">
+                {alerts.map(alert => (
+                  <div key={alert.id} className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-3.5">
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => {
+                        if (alert.check_in_id) {
+                          setPanelOpen(false);
+                          goTo("log", alert.check_in_id);
+                        }
+                      }}
+                      disabled={!alert.check_in_id}
+                    >
+                      <div className="text-[13px] font-medium text-zinc-900">{alert.name}</div>
+                      <div className="mt-0.5 text-[11px] text-zinc-400">
+                        Severity {alert.severity}/10 · {new Date(alert.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {alert.check_in_id && <span className="ml-1 text-zinc-300">· View check-in →</span>}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => dismiss(alert.id)}
+                      className="shrink-0 text-[11px] font-medium text-zinc-400 hover:text-zinc-600"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-[10px] text-zinc-300">
+                Not medical advice. Always consult a healthcare professional.
+              </p>
+              <button
+                onClick={undismissAll}
+                className="shrink-0 text-[10px] font-medium text-zinc-400 underline hover:text-zinc-600"
+              >
+                Reset for testing
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
 
 
 
