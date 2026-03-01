@@ -9,6 +9,8 @@ import {
 } from "../services/mistral";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
+import { chunkAndStoreCheckin } from "../services/chunking";
+import { searchAllByText } from "../services/crossReference";
 
 const router = Router();
 
@@ -33,6 +35,108 @@ router.get("/", async (req: Request, res: Response) => {
     return;
   }
   res.json(data);
+});
+
+// Symptom network graph — cosine similarity between checkin_chunks embeddings
+router.get("/graph", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  const { data: chunks, error } = await supabase
+    .from("checkin_chunks")
+    .select("id, check_in_id, content, embedding, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  if (!chunks || chunks.length === 0) {
+    res.json({ nodes: [], links: [] });
+    return;
+  }
+
+  // Parse embeddings (Supabase returns vector columns as strings)
+  const embeddings: number[][] = chunks.map((c) => {
+    if (typeof c.embedding === "string") return JSON.parse(c.embedding);
+    return c.embedding as number[];
+  });
+
+  // Cosine similarity
+  function cosineSim(a: number[], b: number[]): number {
+    let dot = 0,
+      normA = 0,
+      normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  // Extract short label + category from content
+  function categorize(content: string): { label: string; category: string } {
+    const l = content.toLowerCase();
+    if (/headache|migraine/.test(l)) return { label: "Headache", category: "neurological" };
+    if (/dizz|vertigo/.test(l)) return { label: "Dizziness", category: "neurological" };
+    if (/visual|zigzag|stars|eye/.test(l)) return { label: "Visual disturbance", category: "neurological" };
+    if (/tremor|shak/.test(l)) return { label: "Tremors", category: "neurological" };
+    if (/stomach|digestive|cramp/.test(l)) return { label: "Stomach issues", category: "gastrointestinal" };
+    if (/chest|breath|respiratory|lung/.test(l)) return { label: "Chest / breathing", category: "respiratory" };
+    if (/fatigue|heav[iy]|tired|slug|weakness|mobility|labored/.test(l)) return { label: "Fatigue", category: "musculoskeletal" };
+    if (/medic|pill|drug|iron|inhaler|prescrip/.test(l)) return { label: "Medication", category: "medication" };
+    if (/fall|injur|hurt|twist/.test(l)) return { label: "Injury", category: "musculoskeletal" };
+    if (/blood|oxygen|nutrient|anemi/.test(l)) return { label: "Blood issues", category: "cardiovascular" };
+    if (/test|clinic|doctor|nurse|visit/.test(l)) return { label: "Medical visit", category: "medical" };
+    return { label: content.split(" ").slice(1, 4).join(" "), category: "other" };
+  }
+
+  const LINK_THRESHOLD = 0.83;
+  const COMMONALITY_THRESHOLD = 0.88;
+
+  // Pre-compute full similarity matrix
+  const simMatrix: number[][] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    simMatrix[i] = [];
+    for (let j = 0; j < chunks.length; j++) {
+      simMatrix[i][j] = i === j ? 1 : (j < i ? simMatrix[j][i] : cosineSim(embeddings[i], embeddings[j]));
+    }
+  }
+
+  // Build links (pairs above threshold)
+  const links: { source: string; target: string; similarity: number }[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    for (let j = i + 1; j < chunks.length; j++) {
+      if (simMatrix[i][j] > LINK_THRESHOLD) {
+        links.push({
+          source: chunks[i].id,
+          target: chunks[j].id,
+          similarity: Math.round(simMatrix[i][j] * 1000) / 1000,
+        });
+      }
+    }
+  }
+
+  // Commonality = how many other nodes have high similarity to this one
+  const nodes = chunks.map((c, i) => {
+    const { label, category } = categorize(c.content);
+    let commonality = 0;
+    for (let j = 0; j < chunks.length; j++) {
+      if (i !== j && simMatrix[i][j] > COMMONALITY_THRESHOLD) commonality++;
+    }
+    return {
+      id: c.id,
+      label,
+      category,
+      content: c.content,
+      commonality,
+      check_in_id: c.check_in_id,
+      created_at: c.created_at,
+    };
+  });
+
+  res.json({ nodes, links });
 });
 
 // Dashboard stats summary — must be before /:id to avoid matching "stats" as an id
@@ -129,63 +233,66 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
+  // Step 4: extract + embed + store significant health event chunks (non-blocking)
+  chunkAndStoreCheckin(transcript, data.id, user_id).catch((err) =>
+    console.error("Checkin chunking failed:", err.message),
+  );
+
   res.status(201).json({ checkin: data });
 });
 
-router.post(
-  "/summary",
-  async (req: Request, res: Response) => {
-    const user_id = req.userId!;
+router.post("/summary", async (req: Request, res: Response) => {
+  const user_id = req.userId!;
 
-    // Load last 7 days of check-ins for this user
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // Load last 7 days of check-ins for this user
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data: checkIns, error } = await supabase
-      .from("check_ins")
-      .select(
-        "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
-      )
-      .eq("user_id", user_id)
-      .gte("created_at", sevenDaysAgo.toISOString())
-      .order("created_at", { ascending: true });
+  const { data: checkIns, error } = await supabase
+    .from("check_ins")
+    .select(
+      "created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason",
+    )
+    .eq("user_id", user_id)
+    .gte("created_at", sevenDaysAgo.toISOString())
+    .order("created_at", { ascending: true });
 
-    if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message);
 
-    if (!checkIns || checkIns.length === 0) {
-      res.json({
-        context: null,
-        message: "No check-ins found for the past 7 days",
-      });
-      return;
+  if (!checkIns || checkIns.length === 0) {
+    res.json({
+      context: null,
+      message: "No check-ins found for the past 7 days",
+    });
+    return;
+  }
+
+  // Map each entry to a human-readable date label
+  const now = new Date();
+  const mapped = checkIns.map((entry) => {
+    const entryDate = new Date(entry.created_at);
+    const diffMs = now.getTime() - entryDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    let dateLabel: string;
+    if (diffDays === 0) {
+      dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+    } else if (diffDays === 1) {
+      dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+    } else {
+      dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
     }
 
-    // Map each entry to a human-readable date label
-    const now = new Date();
-    const mapped = checkIns.map((entry) => {
-      const entryDate = new Date(entry.created_at);
-      const diffMs = now.getTime() - entryDate.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return {
+      date: dateLabel,
+      data: entry as CheckInExtraction,
+    };
+  });
 
-      let dateLabel: string;
-      if (diffDays === 0) {
-        dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
-      } else if (diffDays === 1) {
-        dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
-      } else {
-        dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
-      }
+  const context = await generateConversationContext(mapped);
 
-      return {
-        date: dateLabel,
-        data: entry as CheckInExtraction,
-      };
-    });
-
-    const context = await generateConversationContext(mapped);
-
-    res.json({
-      context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
+  res.json({
+    context: `${context}\n\nThe user did NOT provide you with this context - this was generated out of his stored data. So do not act as if the user just told you this information, but rather that you already know this about the user as context for your conversation.
           Give just a quick warm opening greeting, then immediately jump into the health check-in conversation. Follow these rules:
 - Keep every response to 3-4 sentences maximum
 - Follow this agenda in order: energy → mood → sleep hours → any symptoms or notes (optionally food too if it seems relevant)
@@ -193,9 +300,8 @@ router.post(
 - Once all agenda items are covered, wrap up warmly in one sentence
 - Never give medical advice
 - Do not engage in small talk or ask questions outside the agenda until the agenda is fully covered`,
-    });
-  },
-);
+  });
+});
 
 interface ChatStartBody {
   systemPrompt: string;
@@ -236,5 +342,27 @@ router.post(
     res.json({ message });
   },
 );
+
+// Search all health data (check-ins, documents, chunks) by natural language query
+// GET /api/checkin/search?q=headache+and+fatigue&limit=5&threshold=0.3
+router.get("/search", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const query = req.query.q as string;
+
+  if (!query || query.trim() === "") {
+    res.status(400).json({ error: "Query parameter 'q' is required" });
+    return;
+  }
+
+  const limit = req.query.limit
+    ? parseInt(req.query.limit as string)
+    : undefined;
+  const threshold = req.query.threshold
+    ? parseFloat(req.query.threshold as string)
+    : undefined;
+
+  const results = await searchAllByText(query, userId, { limit, threshold });
+  res.json(results);
+});
 
 export default router;
