@@ -14,7 +14,7 @@ export function LatestEntry({ latest, onClick }: LatestEntryProps) {
   return (
     <div
       onClick={onClick}
-      className="w-full cursor-pointer rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
+      className="w-full mb-3 cursor-pointer rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
     >
       <div className="mb-2.5 flex items-center justify-between">
         <div className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
