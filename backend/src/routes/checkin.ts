@@ -233,7 +233,27 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
-  // Step 4: extract + embed + store significant health event chunks (non-blocking)
+  // Step 4: insert extracted symptoms into the symptoms table
+  if (extracted.symptoms && extracted.symptoms.length > 0 && data) {
+    const symptomRows = extracted.symptoms.map((s) => ({
+      user_id,
+      check_in_id: data.id,
+      name: s.name,
+      severity: s.severity,
+      body_area: s.body_area,
+      is_critical: s.is_critical,
+      alert_level: s.alert_level,
+      alert_message: s.alert_message,
+    }));
+    const { error: symptomError } = await supabase.from("symptoms").insert(symptomRows);
+    if (symptomError) {
+      console.error("Failed to insert symptoms:", symptomError.message);
+    } else {
+      console.log(`Created ${symptomRows.length} symptom records for check-in ${data.id}`);
+    }
+  }
+
+  // Step 5: extract + embed + store significant health event chunks (non-blocking)
   chunkAndStoreCheckin(transcript, data.id, user_id).catch((err) =>
     console.error("Checkin chunking failed:", err.message),
   );
@@ -285,7 +305,7 @@ router.post("/summary", async (req: Request, res: Response) => {
 
     return {
       date: dateLabel,
-      data: entry as CheckInExtraction,
+      data: entry as unknown as CheckInExtraction,
     };
   });
 

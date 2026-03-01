@@ -27,6 +27,15 @@ export async function embedText(text: string): Promise<number[]> {
   return embedding;
 }
 
+const SymptomSchema = z.object({
+  name: z.string(),
+  severity: z.number().int().min(1).max(10),
+  body_area: z.string().nullable(),
+  is_critical: z.boolean(),
+  alert_level: z.enum(["info", "warning", "critical"]),
+  alert_message: z.string().nullable(),
+});
+
 const CheckInSchema = z.object({
   summary: z.string(),
   mood: z.string().nullable(),
@@ -36,6 +45,7 @@ const CheckInSchema = z.object({
   notes: z.string().nullable(),
   flagged: z.boolean(),
   flag_reason: z.string().nullable(),
+  symptoms: z.array(SymptomSchema).default([]),
 });
 
 export type CheckInExtraction = z.infer<typeof CheckInSchema>;
@@ -51,7 +61,7 @@ export async function extractCheckinData(
       {
         role: "system",
         content: `You are a health data extraction assistant. Given a voice check-in transcript, extract structured health data.
-        
+
 The summary will be sent to a text embedding model to power future health analytics and pattern recognition. Cover the following topics if mentioned: symptoms, mood, energy levels, food intake, sleep, and any other health-related observations. Be concise but informative.
 
 - summary: 4-6 sentence clean summary of the person's health today
@@ -61,7 +71,21 @@ The summary will be sent to a text embedding model to power future health analyt
 - sleep_hours: number, null if not mentioned
 - notes: any additional health observations worth noting, null if none
 - flagged: true if any concerning symptoms are mentioned, otherwise false
-- flag_reason: reason for flagging, null if not flagged`,
+- flag_reason: reason for flagging, null if not flagged
+- symptoms: array of extracted symptoms, each with:
+    - name: symptom name (e.g., "headache", "fatigue", "chest pain")
+    - severity: estimated severity 1-10 from context
+    - body_area: body area (e.g., "head", "chest", "stomach"), null if general
+    - is_critical: true for emergency symptoms
+    - alert_level: "info" | "warning" | "critical"
+    - alert_message: brief alert text if warning/critical, null otherwise
+
+Symptom extraction rules:
+- Extract ALL mentioned symptoms, even mild ones.
+- Err on the side of flagging concerning symptoms (false positives > false negatives).
+- Critical symptoms that MUST be flagged as is_critical=true, alert_level="critical": chest pain, difficulty breathing, shortness of breath, suicidal ideation, severe allergic reactions, stroke signs (sudden numbness, confusion, trouble speaking, severe headache), heart attack signs.
+- Warning symptoms (alert_level="warning"): persistent headaches, high fever, dizziness, fainting, blood in stool/urine, unexplained weight loss, severe fatigue.
+- Return an empty array if no symptoms are mentioned.`,
       },
       {
         role: "user",

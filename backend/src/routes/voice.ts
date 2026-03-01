@@ -7,6 +7,7 @@ import {
   getConversationDetails,
 } from "../services/elevenlabs";
 import { requireAuth } from "../middleware/auth";
+import { chunkAndStoreCheckin } from "../services/chunking";
 
 const router = Router();
 
@@ -195,6 +196,13 @@ async function syncCallFromElevenLabs(
     }
 
     console.log(`[sync] Check-in created: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
+
+    // Extract + embed + store significant health event chunks (non-blocking)
+    if (checkin) {
+      chunkAndStoreCheckin(transcriptText, checkin.id, userId).catch((err) =>
+        console.error(`[sync] Checkin chunking failed for call ${callId}:`, err.message),
+      );
+    }
   }
 
   return { updated: true, status: updates.status as string };
@@ -376,6 +384,13 @@ router.post("/backfill", async (req: Request, res: Response) => {
               console.log(`[backfill] Created ${symptomRows.length} symptoms for call ${call.id}`);
             }
 
+            // Extract + embed + store significant health event chunks (non-blocking)
+            if (checkin) {
+              chunkAndStoreCheckin(call.transcript!, checkin.id, call.user_id).catch((err) =>
+                console.error(`[backfill] Checkin chunking failed for call ${call.id}:`, err.message),
+              );
+            }
+
             console.log(`[backfill] Parsed: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
             results.push({ id: call.id, phase: 2, updated: true, status: "parsed" });
           } catch (err) {
@@ -466,9 +481,18 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       .eq("id", userId)
       .single();
 
-    const signedUrl = await getSignedUrl(agentId);
+    // Try to get signed URL, but also return agent_id as fallback
+    // (SDK v0.14.x: signedUrl → WebSocket, agentId → WebRTC via LiveKit)
+    let signedUrl: string | null = null;
+    try {
+      signedUrl = await getSignedUrl(agentId);
+    } catch (urlErr) {
+      console.warn("[voice] Failed to get signed URL, falling back to agent_id:", (urlErr as Error).message);
+    }
+
     res.json({
       signed_url: signedUrl,
+      agent_id: agentId,
       dynamic_variables: {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
