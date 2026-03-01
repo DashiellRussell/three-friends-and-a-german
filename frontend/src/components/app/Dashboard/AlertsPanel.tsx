@@ -94,7 +94,7 @@ export function AlertsPanel({
             onClick={onUndismissAll}
             className="shrink-0 text-[10px] font-medium text-zinc-400 underline hover:text-zinc-600"
           >
-            Reset for testing
+            Reset dismissed alerts
           </button>
         </div>
       </div>
