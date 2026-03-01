@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useUser } from "@/lib/user-context";
-import { Dashboard } from "@/components/app/dashboard";
+import { Dashboard } from "@/components/app/Dashboard";
 import { Log } from "@/components/app/log";
 import { Trends } from "@/components/app/trends";
 import { Profile } from "@/components/app/profile";
@@ -59,13 +59,25 @@ function LoginScreen() {
     <div className="flex h-dvh flex-col items-center justify-center bg-[#fafafa] px-8">
       <div className="mb-10 flex flex-col items-center">
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          >
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           </svg>
         </div>
-        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">Kira</h1>
-        <p className="mt-1 text-[14px] text-zinc-400">Your AI health companion</p>
+        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">
+          Kira
+        </h1>
+        <p className="mt-1 text-[14px] text-zinc-400">
+          Your AI health companion
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="w-full max-w-[320px]">
@@ -77,9 +89,7 @@ function LoginScreen() {
           autoFocus
           className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 text-[15px] text-zinc-900 placeholder:text-zinc-300 outline-none transition-colors focus:border-zinc-400"
         />
-        {error && (
-          <p className="mt-2 text-[13px] text-red-500">{error}</p>
-        )}
+        {error && <p className="mt-2 text-[13px] text-red-500">{error}</p>}
         <button
           type="submit"
           disabled={loading || !email.trim()}
@@ -100,7 +110,9 @@ function DemoApp() {
   const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [targetCheckinId, setTargetCheckinId] = useState<string | null>(null);
-  const [logSubTab, setLogSubTab] = useState<"log" | "files" | "reports" | undefined>(undefined);
+  const [logSubTab, setLogSubTab] = useState<
+    "log" | "files" | "reports" | undefined
+  >(undefined);
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [callMode, setCallMode] = useState(false);
@@ -146,8 +158,21 @@ function DemoApp() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <Dashboard goTo={(t, checkinId) => { setTab(t as Tab); setTargetCheckinId(checkinId ?? null); }} />}
-        {tab === "log" && <Log targetCheckinId={targetCheckinId} onTargetConsumed={() => setTargetCheckinId(null)} initialSubTab={logSubTab} />}
+        {tab === "dashboard" && (
+          <Dashboard
+            goTo={(t, checkinId) => {
+              setTab(t as Tab);
+              setTargetCheckinId(checkinId ?? null);
+            }}
+          />
+        )}
+        {tab === "log" && (
+          <Log
+            targetCheckinId={targetCheckinId}
+            onTargetConsumed={() => setTargetCheckinId(null)}
+            initialSubTab={logSubTab}
+          />
+        )}
         {tab === "trends" && <Trends />}
         {tab === "profile" && <Profile />}
       </div>
@@ -207,19 +232,27 @@ function DemoApp() {
       {/* Input overlay — voice/call mode or new entry popup */}
       {inputOpen && (voiceMode || callMode) && (
         <InputOverlay
-          onClose={() => { setInputOpen(false); setVoiceMode(false); setCallMode(false); }}
+          onClose={() => {
+            setInputOpen(false);
+            setVoiceMode(false);
+            setCallMode(false);
+          }}
           startInVoiceMode={voiceMode}
           startInCallMode={callMode}
           onNavigate={(navTab, subTab) => {
             setTab(navTab as Tab);
-            if (navTab === "log" && subTab) setLogSubTab(subTab as "log" | "files" | "reports");
+            if (navTab === "log" && subTab)
+              setLogSubTab(subTab as "log" | "files" | "reports");
           }}
         />
       )}
       {inputOpen && !voiceMode && !callMode && (
         <NewEntryPopup
           onClose={() => setInputOpen(false)}
-          onCallMe={() => { setCallMode(true); setInputOpen(true); }}
+          onCallMe={() => {
+            setCallMode(true);
+            setInputOpen(true);
+          }}
         />
       )}
     </div>
