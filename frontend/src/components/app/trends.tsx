@@ -1,84 +1,81 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@/lib/user-context";
+import { CHECKINS, MOOD_MAP } from "@/lib/mock-data";
 import { SegmentedControl, Sparkline } from "./shared";
 import { SymptomGraph } from "./symptom-graph";
+import { useUser } from "@/lib/user-context";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 export function Trends() {
   const { user } = useUser();
   const [range, setRange] = useState("week");
-  const [trendsData, setTrendsData] = useState<
-    | {
-      date: string;
-      energy: number | null;
-      sleep: number | null;
-      symptoms?: string[];
-    }[]
-    | null
-  >(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const data = CHECKINS.slice(0, 7).reverse();
+  const labels = data.map((c) => c.date.split(" ")[1]);
+  const energyD = data.map((c) => c.energy);
+  const sleepD = data.map((c) => c.sleep);
+  const moodD = data.map((c) => MOOD_MAP[c.mood] ?? 1);
+
+  const moodCounts: Record<string, number> = { Great: 0, Good: 0, Okay: 0 };
+  data.forEach((c) => {
+    if (moodCounts[c.mood] !== undefined) moodCounts[c.mood]++;
+  });
+  const totalMoods = data.length;
+
+  const symptomCounts: Record<string, number> = {};
+  data.forEach((c) =>
+    c.symptoms.forEach((s) => {
+      symptomCounts[s] = (symptomCounts[s] || 0) + 1;
+    })
+  );
+  const topSymptoms = Object.entries(symptomCounts).sort((a, b) => b[1] - a[1]);
+
+  // Medication adherence from API
+  const [medAdherence, setMedAdherence] = useState<{ name: string; pct: number }[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;
-    setIsLoading(true);
-    const BACKEND_URL =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-    fetch(`${BACKEND_URL}/api/trends?range=${range}`, {
+    const daysMap: Record<string, number> = { week: 7, "2weeks": 14, month: 30 };
+    const days = daysMap[range] || 7;
+    fetch(`${BACKEND_URL}/api/medications/adherence?days=${days}`, {
       headers: { "x-user-id": user.id },
     })
-      .then((r) => r.json())
-      .then((d) => {
-        setTrendsData(d);
-        setIsLoading(false);
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.per_medication && data.per_medication.length > 0) {
+          setMedAdherence(data.per_medication.map((m: { name: string; pct: number }) => ({
+            name: m.name.split(" ")[0],
+            pct: m.pct,
+          })));
+        } else {
+          // Fallback to mock data
+          const medNames = [...new Set(CHECKINS.slice(0, 7).reverse().flatMap((c) => c.meds.map((m) => m.name)))];
+          setMedAdherence(medNames.map((name) => {
+            const mockData = CHECKINS.slice(0, 7).reverse();
+            const total = mockData.filter((c) => c.meds.find((m) => m.name === name)).length;
+            const taken = mockData.filter((c) => c.meds.find((m) => m.name === name && m.taken)).length;
+            return { name: name.split(" ")[0], pct: total > 0 ? Math.round((taken / total) * 100) : 0 };
+          }));
+        }
       })
-      .catch((err) => {
-        console.error(err);
-        setIsLoading(false);
+      .catch(() => {
+        // Fallback to mock
+        const medNames = [...new Set(data.flatMap((c: any) => c.meds.map((m: any) => m.name)))];
+        setMedAdherence(medNames.map((name: string) => {
+          const total = data.filter((c: any) => c.meds.find((m: any) => m.name === name)).length;
+          const taken = data.filter((c: any) => c.meds.find((m: any) => m.name === name && m.taken)).length;
+          return { name: name.split(" ")[0], pct: total > 0 ? Math.round((taken / total) * 100) : 0 };
+        }));
       });
   }, [user?.id, range]);
 
-  const energyD = trendsData ? trendsData.map((c) => c.energy) : [];
-  const sleepD = trendsData ? trendsData.map((c) => c.sleep) : [];
-  const trendLabels = trendsData
-    ? trendsData.map((c, i) => {
-      // c.date is like "Feb 23" or similar from the backend "month day" format
-      const step = range === "month" ? 5 : range === "2weeks" ? 2 : 1;
-
-      // Space labels backwards from the most recent day to ensure today is always labeled
-      if ((trendsData.length - 1 - i) % step !== 0) return "";
-
-      return c.date; // Use "Feb 23" instead of just "23"
-    })
-    : [];
-
-  const validEnergy = energyD.filter((e) => e !== null) as number[];
-  const validSleep = sleepD.filter((s) => s !== null) as number[];
-
-  const avgEnergy =
-    validEnergy.length > 0
-      ? (validEnergy.reduce((a, b) => a + b, 0) / validEnergy.length).toFixed(1)
-      : "0.0";
-  const avgSleep =
-    validSleep.length > 0
-      ? (validSleep.reduce((a, b) => a + b, 0) / validSleep.length).toFixed(1)
-      : "0.0";
-
-  const symptomCounts: Record<string, number> = {};
-  if (trendsData) {
-    trendsData.forEach((c) =>
-      c.symptoms?.forEach((s: string) => {
-        symptomCounts[s] = (symptomCounts[s] || 0) + 1;
-      }),
-    );
-  }
-  const topSymptoms = Object.entries(symptomCounts).sort((a, b) => b[1] - a[1]);
+  const avgEnergy = (energyD.reduce((a, b) => a + b, 0) / energyD.length).toFixed(1);
+  const avgSleep = (sleepD.reduce((a, b) => a + b, 0) / sleepD.length).toFixed(1);
 
   return (
     <div className="px-5 pt-8 pb-[100px]">
-      <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900">
-        Trends
-      </h2>
+      <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900">Trends</h2>
       <p className="mb-5 text-xs text-zinc-400">Patterns from your check-ins</p>
 
       <SegmentedControl
@@ -94,163 +91,97 @@ export function Trends() {
       {/* Summary cards */}
       <div className="mt-5 mb-5 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-zinc-100 bg-white p-4 transition-all hover:border-zinc-200 hover:shadow-sm">
-          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-            Avg Energy
+          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-zinc-400">Avg Energy</div>
+          <div className="text-[28px] font-semibold tracking-tight text-zinc-900">
+            {avgEnergy}<span className="text-xs text-zinc-300">/10</span>
           </div>
-          {isLoading ? (
-            <div className="flex h-[36px] items-center">
-              <div className="h-7 w-12 animate-pulse rounded bg-zinc-200/80" />
-            </div>
-          ) : (
-            <>
-              <div className="text-[28px] font-semibold tracking-tight text-zinc-900">
-                {avgEnergy}
-                <span className="text-xs text-zinc-300">/10</span>
-              </div>
-              <div
-                className={`mt-1 text-[11px] font-medium ${parseFloat(avgEnergy) >= 6.5 ? "text-emerald-600" : "text-amber-600"}`}
-              >
-                {parseFloat(avgEnergy) >= 6.5 ? "↑ Stable" : "↓ Below baseline"}
-              </div>
-            </>
-          )}
+          <div className={`mt-1 text-[11px] font-medium ${parseFloat(avgEnergy) >= 6.5 ? "text-emerald-600" : "text-amber-600"}`}>
+            {parseFloat(avgEnergy) >= 6.5 ? "↑ Stable" : "↓ Below baseline"}
+          </div>
         </div>
         <div className="rounded-2xl border border-zinc-100 bg-white p-4 transition-all hover:border-zinc-200 hover:shadow-sm">
-          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-            Avg Sleep
+          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-zinc-400">Avg Sleep</div>
+          <div className="text-[28px] font-semibold tracking-tight text-zinc-900">
+            {avgSleep}<span className="text-xs text-zinc-300">hrs</span>
           </div>
-          {isLoading ? (
-            <div className="flex h-[36px] items-center">
-              <div className="h-7 w-12 animate-pulse rounded bg-zinc-200/80" />
-            </div>
-          ) : (
-            <>
-              <div className="text-[28px] font-semibold tracking-tight text-zinc-900">
-                {avgSleep}
-                <span className="text-xs text-zinc-300">hrs</span>
-              </div>
-              <div
-                className={`mt-1 text-[11px] font-medium ${parseFloat(avgSleep) >= 7 ? "text-emerald-600" : "text-amber-600"}`}
-              >
-                {parseFloat(avgSleep) >= 7 ? "On target" : "Below 7hr target"}
-              </div>
-            </>
-          )}
+          <div className={`mt-1 text-[11px] font-medium ${parseFloat(avgSleep) >= 7 ? "text-emerald-600" : "text-amber-600"}`}>
+            {parseFloat(avgSleep) >= 7 ? "On target" : "Below 7hr target"}
+          </div>
         </div>
       </div>
 
       {/* Energy */}
       <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
-        <div className="mb-4 text-[13px] font-semibold text-zinc-900">
-          Energy (1-10)
-        </div>
-        {isLoading ? (
-          <div className="h-[52px] w-full animate-pulse rounded-xl bg-zinc-200/60" />
-        ) : (
-          <div className="relative pl-4">
-            <div className="absolute left-0 top-0 bottom-5 flex flex-col justify-between text-[9px] text-zinc-300">
-              <span>10</span>
-              <span>1</span>
-            </div>
-            <Sparkline
-              data={energyD}
-              labels={trendLabels}
-              color="#18181b"
-              fill
-              height={52}
-              highlight={energyD.length - 1}
-            />
-          </div>
-        )}
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Energy</div>
+        <Sparkline data={energyD} labels={labels} color="#18181b" fill height={52} highlight={energyD.length - 1} />
       </div>
 
       {/* Sleep */}
       <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
-        <div className="mb-4 text-[13px] font-semibold text-zinc-900">
-          Sleep (hrs)
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Sleep</div>
+        <Sparkline data={sleepD} labels={labels} color="#818cf8" fill height={52} highlight={sleepD.length - 1} />
+      </div>
+
+      {/* Mood distribution */}
+      <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Mood Distribution</div>
+        <div className="mb-3 flex h-2.5 overflow-hidden rounded-full">
+          {[
+            { key: "Great", color: "bg-emerald-400" },
+            { key: "Good", color: "bg-amber-400" },
+            { key: "Okay", color: "bg-red-400" },
+          ].map(
+            (m) =>
+              moodCounts[m.key] > 0 && (
+                <div
+                  key={m.key}
+                  className={`${m.color} transition-all duration-500`}
+                  style={{ width: `${(moodCounts[m.key] / totalMoods) * 100}%` }}
+                />
+              )
+          )}
         </div>
-        {isLoading ? (
-          <div className="h-[72px] w-full animate-pulse rounded-xl bg-zinc-200/60" />
-        ) : (
-          <div className="relative pl-6">
-            {/* Guide lines & Labels */}
-            <div className="absolute left-0 top-0 bottom-5 right-0 flex flex-col justify-between text-[9px] text-zinc-300">
-              <div className="relative w-full flex items-center">
-                <span className="absolute left-0 w-4 font-medium text-right mt-1">
-                  12
-                </span>
-                <div className="ml-6 flex-1 border-t border-dashed border-zinc-200 mt-1" />
-              </div>
-              <div className="relative w-full flex items-center">
-                <span className="absolute left-0 w-4 font-medium text-right mt-1">
-                  9
-                </span>
-                <div className="ml-6 flex-1 mt-1 opacity-0" />
-              </div>
-              <div className="relative w-full flex items-center">
-                <span className="absolute left-0 w-4 font-medium text-right mt-1">
-                  6
-                </span>
-                <div className="ml-6 flex-1 border-t border-dashed border-zinc-200 mt-1" />
-              </div>
-              <div className="relative w-full flex items-center">
-                <span className="absolute left-0 w-4 font-medium text-right mt-[3px]">
-                  3
-                </span>
-                <div className="ml-6 flex-1 mt-[3px] opacity-0" />
-              </div>
-              <div className="relative w-full flex items-center pb-2">
-                <span className="absolute left-0 w-4 font-medium text-right mt-[3px]">
-                  0
-                </span>
-                <div className="ml-6 flex-1 border-t border-dashed border-zinc-200 mt-[3px]" />
-              </div>
+        <div className="flex gap-5">
+          {[
+            { key: "Great", color: "bg-emerald-400", emoji: "😊" },
+            { key: "Good", color: "bg-amber-400", emoji: "🙂" },
+            { key: "Okay", color: "bg-red-400", emoji: "😐" },
+          ].map((m) => (
+            <div key={m.key} className="flex items-center gap-1.5">
+              <div className={`h-2 w-2 rounded-sm ${m.color}`} />
+              <span className="text-xs text-zinc-500">{m.emoji} {m.key}</span>
+              <span className="text-xs font-semibold text-zinc-900">{moodCounts[m.key]}</span>
             </div>
-            <div className="relative top-[4px] z-10">
-              <Sparkline
-                data={sleepD}
-                labels={trendLabels}
-                color="#818cf8"
-                fill
-                height={64}
-                highlight={sleepD.length - 1}
-                minStatic={0}
-                maxStatic={12}
-              />
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
+      </div>
+
+      {/* Mood trend */}
+      <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Mood Trend</div>
+        <Sparkline data={moodD} labels={labels} color="#f59e0b" height={40} highlight={moodD.length - 1} />
+        <div className="mt-1.5 flex justify-between">
+          <span className="text-[9px] text-zinc-300">Okay</span>
+          <span className="text-[9px] text-zinc-300">Great</span>
+        </div>
       </div>
 
       {/* Symptoms */}
       <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
-        <div className="mb-4 text-[13px] font-semibold text-zinc-900">
-          Top Symptoms
-        </div>
-        {isLoading ? (
-          <div className="flex flex-col gap-3">
-            <div className="h-[28px] w-full animate-pulse rounded bg-zinc-200/60" />
-            <div className="h-[28px] w-full animate-pulse rounded bg-zinc-200/60" />
-          </div>
-        ) : topSymptoms.length === 0 ? (
-          <div className="text-sm text-zinc-400">
-            No symptoms reported this period
-          </div>
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Top Symptoms</div>
+        {topSymptoms.length === 0 ? (
+          <div className="text-sm text-zinc-400">No symptoms reported</div>
         ) : (
           topSymptoms.map(([name, count]) => (
             <div key={name} className="mb-3">
               <div className="mb-1.5 flex justify-between">
-                <span className="text-[13px] text-zinc-700 capitalize">
-                  {name.replace("_", " ")}
-                </span>
+                <span className="text-[13px] text-zinc-700">{name}</span>
                 <span className="text-xs text-zinc-400">{count}x</span>
               </div>
               <div className="h-1.5 rounded-full bg-zinc-100">
                 <div
                   className="h-full rounded-full bg-red-400 transition-all duration-500"
-                  style={{
-                    width: `${Math.min((count / (trendsData?.length || 1)) * 100, 100)}%`,
-                  }}
+                  style={{ width: `${(count / data.length) * 100}%` }}
                 />
               </div>
             </div>
@@ -258,7 +189,37 @@ export function Trends() {
         )}
       </div>
 
+      {/* Medication adherence */}
+      <div className="mb-3 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
+        <div className="mb-4 text-[13px] font-semibold text-zinc-900">Medication Adherence</div>
+        {medAdherence.map((med, i) => (
+          <div key={med.name} className={i < medAdherence.length - 1 ? "mb-3" : ""}>
+            <div className="mb-1.5 flex justify-between">
+              <span className="text-[13px] text-zinc-700">{med.name}</span>
+              <span className={`text-[13px] font-semibold ${med.pct >= 90 ? "text-emerald-600" : med.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>
+                {med.pct}%
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-zinc-100">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${med.pct >= 90 ? "bg-emerald-400" : med.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`}
+                style={{ width: `${med.pct}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
 
+      {/* AI Insight */}
+      <div className="mb-3 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
+        <div className="mb-2 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+          <span className="text-xs font-semibold text-sky-700">AI Insight</span>
+        </div>
+        <p className="text-[13px] leading-relaxed text-slate-600">
+          Your energy dips correlate with nights under 6 hours sleep. Feb 27 shows the lowest energy (5/10) following 5 hours sleep, combined with missed Vitamin D and new symptoms (thirst, fatigue) that may relate to your elevated HbA1c.
+        </p>
+      </div>
 
       {/* Symptom Network Graph */}
       <SymptomGraph />

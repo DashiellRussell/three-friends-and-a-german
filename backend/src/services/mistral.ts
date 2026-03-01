@@ -27,6 +27,21 @@ export async function embedText(text: string): Promise<number[]> {
   return embedding;
 }
 
+const SymptomSchema = z.object({
+  name: z.string(),
+  severity: z.number().int().min(1).max(10),
+  body_area: z.string().nullable(),
+  is_critical: z.boolean(),
+  alert_level: z.enum(["info", "warning", "critical"]),
+  alert_message: z.string().nullable(),
+});
+
+const MedicationMentionSchema = z.object({
+  name: z.string(),
+  taken: z.boolean(),
+  notes: z.string().nullable(),
+});
+
 const CheckInSchema = z.object({
   summary: z.string(),
   mood: z.string().nullable(),
@@ -36,6 +51,8 @@ const CheckInSchema = z.object({
   notes: z.string().nullable(),
   flagged: z.boolean(),
   flag_reason: z.string().nullable(),
+  symptoms: z.array(SymptomSchema).default([]),
+  medications_mentioned: z.array(MedicationMentionSchema).default([]),
 });
 
 export type CheckInExtraction = z.infer<typeof CheckInSchema>;
@@ -51,7 +68,7 @@ export async function extractCheckinData(
       {
         role: "system",
         content: `You are a health data extraction assistant. Given a voice check-in transcript, extract structured health data.
-        
+
 The summary will be sent to a text embedding model to power future health analytics and pattern recognition. Cover the following topics if mentioned: symptoms, mood, energy levels, food intake, sleep, and any other health-related observations. Be concise but informative.
 
 - summary: 4-6 sentence clean summary of the person's health today
@@ -61,7 +78,28 @@ The summary will be sent to a text embedding model to power future health analyt
 - sleep_hours: number, null if not mentioned
 - notes: any additional health observations worth noting, null if none
 - flagged: true if any concerning symptoms are mentioned, otherwise false
-- flag_reason: reason for flagging, null if not flagged`,
+- flag_reason: reason for flagging, null if not flagged
+- symptoms: array of extracted symptoms, each with:
+    - name: symptom name (e.g., "headache", "fatigue", "chest pain")
+    - severity: estimated severity 1-10 from context
+    - body_area: body area (e.g., "head", "chest", "stomach"), null if general
+    - is_critical: true for emergency symptoms
+    - alert_level: "info" | "warning" | "critical"
+    - alert_message: brief alert text if warning/critical, null otherwise
+
+Symptom extraction rules:
+- Extract ALL mentioned symptoms, even mild ones.
+- Err on the side of flagging concerning symptoms (false positives > false negatives).
+- Critical symptoms that MUST be flagged as is_critical=true, alert_level="critical": chest pain, difficulty breathing, shortness of breath, suicidal ideation, severe allergic reactions, stroke signs (sudden numbness, confusion, trouble speaking, severe headache), heart attack signs.
+- Warning symptoms (alert_level="warning"): persistent headaches, high fever, dizziness, fainting, blood in stool/urine, unexplained weight loss, severe fatigue.
+- Return an empty array if no symptoms are mentioned.
+
+Medication extraction:
+- medications_mentioned: array of medications the user mentions taking (or missing), each with:
+    - name: medication name as stated (e.g., "metformin", "vitamin D", "blood pressure pill")
+    - taken: true if they say they took it, false if they say they missed/skipped it
+    - notes: any extra context (e.g., "took a double dose", "ran out"), null if none
+- Return an empty array if no medications are mentioned.`,
       },
       {
         role: "user",
@@ -88,9 +126,9 @@ export async function generateConversationContext(
     messages: [
       {
         role: "system",
-        content: `You are generating a system prompt for a conversational health AI assistant. 
-        
-Your output will be injected directly as a system prompt into a voice-based AI that is about to start a daily health check-in conversation with the user.
+        content: `You are generating a system prompt for Tessera, a warm AI health companion.
+
+Your output will be injected directly as a system prompt into Tessera, a voice-based AI that is about to start a daily health check-in conversation with the user.
 
 The system prompt you write should:
 - Be written in second person, addressing the conversational AI (e.g. "The user has been..." or "You know that...")

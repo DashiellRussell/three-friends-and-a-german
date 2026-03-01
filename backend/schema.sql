@@ -217,6 +217,56 @@ create policy "Users read own calls" on outbound_calls for select using (user_id
 create index calls_user_created on outbound_calls (user_id, created_at desc);
 
 -- ============================================================
+-- 8. medications (user's medication list)
+-- ============================================================
+create table medications (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references profiles(id) on delete cascade,
+  name        text not null,
+  dosage      text,
+  frequency   text default 'daily',
+  time_of_day text,
+  instructions text,
+  active      boolean default true,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+alter table medications enable row level security;
+create policy "Users read own medications"  on medications for select using (user_id = auth.uid());
+create policy "Users insert own medications" on medications for insert with check (user_id = auth.uid());
+create policy "Users update own medications" on medications for update using (user_id = auth.uid());
+
+create index medications_user_active on medications (user_id) where active = true;
+
+create trigger medications_updated_at
+  before update on medications
+  for each row execute function update_updated_at();
+
+-- ============================================================
+-- 9. medication_logs (daily intake records)
+-- ============================================================
+create table medication_logs (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references profiles(id) on delete cascade,
+  medication_id   uuid not null references medications(id) on delete cascade,
+  check_in_id     uuid references check_ins(id) on delete set null,
+  taken           boolean not null,
+  logged_at       timestamptz default now(),
+  scheduled_date  date default current_date,
+  source          text default 'manual' check (source in ('manual', 'voice', 'text', 'auto')),
+  notes           text
+);
+
+alter table medication_logs enable row level security;
+create policy "Users read own medication_logs"  on medication_logs for select using (user_id = auth.uid());
+create policy "Users insert own medication_logs" on medication_logs for insert with check (user_id = auth.uid());
+create policy "Users update own medication_logs" on medication_logs for update using (user_id = auth.uid());
+
+create unique index medication_logs_unique on medication_logs (user_id, medication_id, scheduled_date);
+create index medication_logs_user_date on medication_logs (user_id, scheduled_date desc);
+
+-- ============================================================
 -- Vector indexes (enable once >1K rows per table)
 -- ============================================================
 -- create index check_ins_embedding_idx on check_ins using ivfflat (embedding vector_cosine_ops) with (lists = 100);

@@ -284,7 +284,7 @@ All LLM calls go through the Mistral service. Key functions:
 
 1. User enters email on demo page → `POST /api/profiles/login`
 2. Backend finds or creates profile by email → returns `UserProfile`
-3. Frontend stores profile in localStorage (`Tessera_user` key) via `UserProvider`
+3. Frontend stores profile in localStorage (`tessera_user` key) via `UserProvider`
 4. All subsequent API calls include `x-user-id` header (dev mode) or `Authorization: Bearer <token>` (production)
 
 ### UserProfile Shape

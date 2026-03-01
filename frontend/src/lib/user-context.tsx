@@ -10,7 +10,7 @@ import {
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const STORAGE_KEY = "Tessera_user";
+const STORAGE_KEY = "tessera_user";
 
 export interface UserProfile {
   id: string;

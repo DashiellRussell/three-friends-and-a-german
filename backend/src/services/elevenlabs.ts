@@ -64,6 +64,24 @@ export async function getConversationDetails(
   return data;
 }
 
+export async function updateAgent(
+  agentId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/v1/convai/agents/${agentId}`, {
+    method: "PATCH",
+    headers: {
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Failed to update agent ${agentId} (${res.status}): ${errBody}`);
+  }
+}
+
 export async function initiateOutboundCall(
   toNumber: string,
   dynamicVariables: Record<string, string>,
