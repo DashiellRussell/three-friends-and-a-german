@@ -36,6 +36,12 @@ const SymptomSchema = z.object({
   alert_message: z.string().nullable(),
 });
 
+const MedicationMentionSchema = z.object({
+  name: z.string(),
+  taken: z.boolean(),
+  notes: z.string().nullable(),
+});
+
 const CheckInSchema = z.object({
   summary: z.string(),
   mood: z.string().nullable(),
@@ -46,6 +52,7 @@ const CheckInSchema = z.object({
   flagged: z.boolean(),
   flag_reason: z.string().nullable(),
   symptoms: z.array(SymptomSchema).default([]),
+  medications_mentioned: z.array(MedicationMentionSchema).default([]),
 });
 
 export type CheckInExtraction = z.infer<typeof CheckInSchema>;
@@ -85,7 +92,14 @@ Symptom extraction rules:
 - Err on the side of flagging concerning symptoms (false positives > false negatives).
 - Critical symptoms that MUST be flagged as is_critical=true, alert_level="critical": chest pain, difficulty breathing, shortness of breath, suicidal ideation, severe allergic reactions, stroke signs (sudden numbness, confusion, trouble speaking, severe headache), heart attack signs.
 - Warning symptoms (alert_level="warning"): persistent headaches, high fever, dizziness, fainting, blood in stool/urine, unexplained weight loss, severe fatigue.
-- Return an empty array if no symptoms are mentioned.`,
+- Return an empty array if no symptoms are mentioned.
+
+Medication extraction:
+- medications_mentioned: array of medications the user mentions taking (or missing), each with:
+    - name: medication name as stated (e.g., "metformin", "vitamin D", "blood pressure pill")
+    - taken: true if they say they took it, false if they say they missed/skipped it
+    - notes: any extra context (e.g., "took a double dose", "ran out"), null if none
+- Return an empty array if no medications are mentioned.`,
       },
       {
         role: "user",

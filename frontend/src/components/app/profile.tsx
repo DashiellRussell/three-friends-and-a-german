@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
 import { Toggle, Pill, useToast } from "./shared";
+import { Medication } from "./types";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
@@ -46,9 +47,20 @@ export function Profile() {
   const [callError, setCallError] = useState<string | null>(null);
   const { show: showToast, ToastEl } = useToast();
 
+  // Medication state
+  const [medsExpanded, setMedsExpanded] = useState(true);
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [medsLoading, setMedsLoading] = useState(true);
+  const [showAddMed, setShowAddMed] = useState(false);
+  const [newMedName, setNewMedName] = useState("");
+  const [newMedDosage, setNewMedDosage] = useState("");
+  const [newMedFreq, setNewMedFreq] = useState("daily");
+  const [newMedTime, setNewMedTime] = useState("");
+
   useEffect(() => {
     if (!user) return;
     setDocsLoading(true);
+    setMedsLoading(true);
     fetch(`${BACKEND_URL}/api/documents`, {
       headers: { "x-user-id": user.id },
     })
@@ -56,7 +68,56 @@ export function Profile() {
       .then((data) => setDocuments(Array.isArray(data) ? data : data.documents || []))
       .catch(console.error)
       .finally(() => setDocsLoading(false));
+
+    fetch(`${BACKEND_URL}/api/medications`, {
+      headers: { "x-user-id": user.id },
+    })
+      .then((res) => res.json())
+      .then((data) => setMedications(data.medications || []))
+      .catch(console.error)
+      .finally(() => setMedsLoading(false));
   }, [user]);
+
+  const addMedication = useCallback(async () => {
+    if (!user || !newMedName.trim()) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/medications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({
+          name: newMedName.trim(),
+          dosage: newMedDosage.trim() || null,
+          frequency: newMedFreq,
+          time_of_day: newMedTime.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to add medication");
+      const med = await res.json();
+      setMedications((prev) => [...prev, med]);
+      setNewMedName("");
+      setNewMedDosage("");
+      setNewMedFreq("daily");
+      setNewMedTime("");
+      setShowAddMed(false);
+      showToast("Medication added", "success");
+    } catch {
+      showToast("Failed to add medication", "error");
+    }
+  }, [user, newMedName, newMedDosage, newMedFreq, newMedTime, showToast]);
+
+  const removeMedication = useCallback(async (id: string) => {
+    if (!user) return;
+    try {
+      await fetch(`${BACKEND_URL}/api/medications/${id}`, {
+        method: "DELETE",
+        headers: { "x-user-id": user.id },
+      });
+      setMedications((prev) => prev.filter((m) => m.id !== id));
+      showToast("Medication removed", "success");
+    } catch {
+      showToast("Failed to remove medication", "error");
+    }
+  }, [user, showToast]);
 
   const triggerCall = useCallback(async () => {
     if (!user) return;
@@ -223,6 +284,160 @@ export function Profile() {
                   </button>
                 );
               })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Medications */}
+      <div className="mb-7">
+        <button
+          onClick={() => setMedsExpanded(!medsExpanded)}
+          className="mb-2.5 flex w-full items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
+              Medications
+            </span>
+            {!medsLoading && (
+              <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-500">
+                {medications.length}
+              </span>
+            )}
+          </div>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#a1a1aa"
+            strokeWidth="2"
+            strokeLinecap="round"
+            className={`transition-transform duration-200 ${medsExpanded ? "rotate-180" : ""}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {medsExpanded && (
+          <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white">
+            {medsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-600" />
+              </div>
+            ) : medications.length === 0 && !showAddMed ? (
+              <div className="px-4 py-6 text-center text-[13px] text-zinc-400">
+                No medications added yet
+              </div>
+            ) : (
+              <>
+                {medications.map((med, i) => (
+                  <div
+                    key={med.id}
+                    className={`flex items-center gap-3 px-4 py-3 ${
+                      i < medications.length - 1 || showAddMed ? "border-b border-zinc-50" : ""
+                    }`}
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 9h6m-3-3v6" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-medium text-zinc-900">{med.name}</div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-400">
+                        {med.dosage && <span>{med.dosage}</span>}
+                        {med.dosage && med.frequency && <span className="text-zinc-200">·</span>}
+                        <span className="capitalize">{med.frequency}</span>
+                        {med.time_of_day && (
+                          <>
+                            <span className="text-zinc-200">·</span>
+                            <span>{med.time_of_day}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeMedication(med.id)}
+                      className="shrink-0 rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-red-50 hover:text-red-400"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+
+                {/* Inline add form */}
+                {showAddMed && (
+                  <div className="px-4 py-3 space-y-2.5">
+                    <input
+                      type="text"
+                      placeholder="Medication name"
+                      value={newMedName}
+                      onChange={(e) => setNewMedName(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400"
+                      autoFocus
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Dosage (e.g. 500mg)"
+                        value={newMedDosage}
+                        onChange={(e) => setNewMedDosage(e.target.value)}
+                        className="rounded-lg border border-zinc-200 px-3 py-2.5 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Time (e.g. morning)"
+                        value={newMedTime}
+                        onChange={(e) => setNewMedTime(e.target.value)}
+                        className="rounded-lg border border-zinc-200 px-3 py-2.5 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400"
+                      />
+                    </div>
+                    <select
+                      value={newMedFreq}
+                      onChange={(e) => setNewMedFreq(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-[14px] text-zinc-900 outline-none focus:border-zinc-400 bg-white"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="twice daily">Twice daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="as needed">As needed</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowAddMed(false)}
+                        className="flex-1 rounded-lg border border-zinc-200 py-2.5 text-[13px] font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={addMedication}
+                        disabled={!newMedName.trim()}
+                        className="flex-1 rounded-lg bg-zinc-900 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-40"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Add medication button */}
+            {!showAddMed && (
+              <button
+                onClick={() => setShowAddMed(true)}
+                className="flex w-full items-center justify-center gap-1.5 border-t border-zinc-50 py-3 text-[13px] font-medium text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add medication
+              </button>
             )}
           </div>
         )}

@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CHECKINS, MOOD_MAP } from "@/lib/mock-data";
 import { SegmentedControl, Sparkline } from "./shared";
 import { SymptomGraph } from "./symptom-graph";
+import { useUser } from "@/lib/user-context";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 export function Trends() {
+  const { user } = useUser();
   const [range, setRange] = useState("week");
   const data = CHECKINS.slice(0, 7).reverse();
   const labels = data.map((c) => c.date.split(" ")[1]);
@@ -27,12 +31,44 @@ export function Trends() {
   );
   const topSymptoms = Object.entries(symptomCounts).sort((a, b) => b[1] - a[1]);
 
-  const medNames = [...new Set(data.flatMap((c) => c.meds.map((m) => m.name)))];
-  const medAdherence = medNames.map((name) => {
-    const total = data.filter((c) => c.meds.find((m) => m.name === name)).length;
-    const taken = data.filter((c) => c.meds.find((m) => m.name === name && m.taken)).length;
-    return { name: name.split(" ")[0], pct: total > 0 ? Math.round((taken / total) * 100) : 0 };
-  });
+  // Medication adherence from API
+  const [medAdherence, setMedAdherence] = useState<{ name: string; pct: number }[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const daysMap: Record<string, number> = { week: 7, "2weeks": 14, month: 30 };
+    const days = daysMap[range] || 7;
+    fetch(`${BACKEND_URL}/api/medications/adherence?days=${days}`, {
+      headers: { "x-user-id": user.id },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.per_medication && data.per_medication.length > 0) {
+          setMedAdherence(data.per_medication.map((m: { name: string; pct: number }) => ({
+            name: m.name.split(" ")[0],
+            pct: m.pct,
+          })));
+        } else {
+          // Fallback to mock data
+          const medNames = [...new Set(CHECKINS.slice(0, 7).reverse().flatMap((c) => c.meds.map((m) => m.name)))];
+          setMedAdherence(medNames.map((name) => {
+            const mockData = CHECKINS.slice(0, 7).reverse();
+            const total = mockData.filter((c) => c.meds.find((m) => m.name === name)).length;
+            const taken = mockData.filter((c) => c.meds.find((m) => m.name === name && m.taken)).length;
+            return { name: name.split(" ")[0], pct: total > 0 ? Math.round((taken / total) * 100) : 0 };
+          }));
+        }
+      })
+      .catch(() => {
+        // Fallback to mock
+        const medNames = [...new Set(data.flatMap((c: any) => c.meds.map((m: any) => m.name)))];
+        setMedAdherence(medNames.map((name: string) => {
+          const total = data.filter((c: any) => c.meds.find((m: any) => m.name === name)).length;
+          const taken = data.filter((c: any) => c.meds.find((m: any) => m.name === name && m.taken)).length;
+          return { name: name.split(" ")[0], pct: total > 0 ? Math.round((taken / total) * 100) : 0 };
+        }));
+      });
+  }, [user?.id, range]);
 
   const avgEnergy = (energyD.reduce((a, b) => a + b, 0) / energyD.length).toFixed(1);
   const avgSleep = (sleepD.reduce((a, b) => a + b, 0) / sleepD.length).toFixed(1);

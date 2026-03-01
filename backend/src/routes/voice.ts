@@ -61,6 +61,11 @@ interface ParsedCheckin {
     alert_level: "info" | "warning" | "critical";
     alert_message: string | null;
   }>;
+  medications_mentioned: Array<{
+    name: string;
+    taken: boolean;
+    notes: string | null;
+  }>;
 }
 
 async function parseTranscriptWithMistral(transcript: string): Promise<ParsedCheckin> {
@@ -88,6 +93,10 @@ Return a JSON object with these fields:
     - "is_critical": boolean — true for emergency symptoms
     - "alert_level": "info" | "warning" | "critical"
     - "alert_message": string or null — brief alert text if warning/critical
+  "medications_mentioned": array of objects for any medications the user mentions, each with:
+    - "name": string — medication name as stated
+    - "taken": boolean — true if they took it, false if missed/skipped
+    - "notes": string or null — any extra context
 }
 
 Rules:
@@ -113,6 +122,7 @@ Rules:
       summary: "Check-in recorded",
       notes: transcript.slice(0, 500),
       flagged: false, flag_reason: null, symptoms: [],
+      medications_mentioned: [],
     };
   }
 
@@ -127,6 +137,7 @@ Rules:
       ...s,
       severity: Math.max(1, Math.min(10, s.severity ?? 5)),
     }));
+    parsed.medications_mentioned = parsed.medications_mentioned || [];
     return parsed;
   } catch {
     return {
@@ -134,6 +145,7 @@ Rules:
       summary: "Check-in recorded (parse error)",
       notes: transcript.slice(0, 500),
       flagged: false, flag_reason: null, symptoms: [],
+      medications_mentioned: [],
     };
   }
 }
@@ -194,6 +206,57 @@ async function syncCallFromElevenLabs(
       }));
       await supabase.from("symptoms").insert(symptomRows);
       console.log(`[sync] Created ${symptomRows.length} symptom records for call ${callId}`);
+    }
+
+    // Auto-log mentioned medications against user's active med list
+    if (parsed.medications_mentioned.length > 0 && checkin) {
+      try {
+        const { data: activeMeds } = await supabase
+          .from("medications")
+          .select("id, name")
+          .eq("user_id", userId)
+          .eq("active", true);
+
+        if (activeMeds && activeMeds.length > 0) {
+          const today = new Date().toISOString().split("T")[0];
+          for (const mention of parsed.medications_mentioned) {
+            const mentionLower = mention.name.toLowerCase();
+            const match = activeMeds.find((m) =>
+              m.name.toLowerCase().includes(mentionLower) ||
+              mentionLower.includes(m.name.toLowerCase())
+            );
+            if (match) {
+              const { data: existing } = await supabase
+                .from("medication_logs")
+                .select("id")
+                .eq("user_id", userId)
+                .eq("medication_id", match.id)
+                .eq("scheduled_date", today)
+                .maybeSingle();
+
+              if (existing) {
+                await supabase
+                  .from("medication_logs")
+                  .update({ taken: mention.taken, source: "voice", check_in_id: checkin.id, notes: mention.notes })
+                  .eq("id", existing.id);
+              } else {
+                await supabase.from("medication_logs").insert({
+                  user_id: userId,
+                  medication_id: match.id,
+                  check_in_id: checkin.id,
+                  taken: mention.taken,
+                  scheduled_date: today,
+                  source: "voice",
+                  notes: mention.notes,
+                });
+              }
+              console.log(`[sync] Auto-logged medication "${match.name}" (taken=${mention.taken}) for call ${callId}`);
+            }
+          }
+        }
+      } catch (medErr) {
+        console.error(`[sync] Failed to auto-log medications for call ${callId}:`, (medErr as Error).message);
+      }
     }
 
     console.log(`[sync] Check-in created: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
@@ -475,11 +538,11 @@ router.get("/signed-url", async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch user profile + recent check-ins in parallel
+    // Fetch user profile + recent check-ins + active medications in parallel
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [profileResult, checkInsResult] = await Promise.all([
+    const [profileResult, checkInsResult, medsResult] = await Promise.all([
       supabase
         .from("profiles")
         .select("display_name, conditions, allergies, phone_number")
@@ -491,9 +554,15 @@ router.get("/signed-url", async (req: Request, res: Response) => {
         .eq("user_id", userId)
         .gte("created_at", sevenDaysAgo.toISOString())
         .order("created_at", { ascending: true }),
+      supabase
+        .from("medications")
+        .select("name, dosage, frequency")
+        .eq("user_id", userId)
+        .eq("active", true),
     ]);
 
     const profile = profileResult.data;
+    const activeMeds = medsResult.data || [];
 
     // Build conversation context from recent check-ins (non-blocking — voice still works without it)
     let conversationContext = "";
@@ -534,6 +603,10 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       console.warn("[voice] Failed to get signed URL, falling back to agent_id:", (urlErr as Error).message);
     }
 
+    const medicationsStr = activeMeds.length > 0
+      ? activeMeds.map((m) => `${m.name}${m.dosage ? ` ${m.dosage}` : ""}${m.frequency ? ` (${m.frequency})` : ""}`).join(", ")
+      : "none listed";
+
     res.json({
       signed_url: signedUrl,
       agent_id: agentId,
@@ -541,6 +614,7 @@ router.get("/signed-url", async (req: Request, res: Response) => {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
         allergies: profile?.allergies?.join(", ") || "none listed",
+        medications: medicationsStr,
         conversation_context: conversationContext || "No recent check-ins. This is a general wellness check-in. Be warm, introduce yourself as Tessera, and have a natural conversation about how they're feeling today. When they share something, ask a brief follow-up to draw out more detail before moving on.",
       },
     });

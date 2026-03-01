@@ -81,7 +81,7 @@ export function LogTab({ checkIns, expanded, toggle, onViewDetail }: LogTabProps
 
                         {isOpen && (
                             <div className="px-3.5 pb-3 border-t border-zinc-50" style={{ animation: "fadeUp 0.2s" }}>
-                                <div className="pt-2.5 grid grid-cols-3 gap-2">
+                                <div className={`pt-2.5 grid gap-2 ${c.medication_logs && c.medication_logs.length > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
                                     <div className="rounded-md bg-zinc-50 px-2.5 py-2">
                                         <div className="text-[10px] text-zinc-400 mb-0.5">Energy</div>
                                         <div className="text-sm font-medium text-zinc-900">{c.energy || 0}<span className="text-zinc-300 text-[10px] font-normal">/10</span></div>
@@ -96,6 +96,18 @@ export function LogTab({ checkIns, expanded, toggle, onViewDetail }: LogTabProps
                                             {c.symptoms ? c.symptoms.length : 0}
                                         </div>
                                     </div>
+                                    {c.medication_logs && c.medication_logs.length > 0 && (
+                                        <div className="rounded-md bg-zinc-50 px-2.5 py-2">
+                                            <div className="text-[10px] text-zinc-400 mb-0.5">Meds</div>
+                                            <div className={`text-sm font-medium ${
+                                                c.medication_logs.filter((l) => l.taken).length === c.medication_logs.length
+                                                    ? "text-emerald-500"
+                                                    : "text-amber-500"
+                                            }`}>
+                                                {c.medication_logs.filter((l) => l.taken).length}/{c.medication_logs.length}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {(c.summary || c.notes) && (

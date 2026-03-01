@@ -72,7 +72,7 @@ router.get("/", async (req: Request, res: Response) => {
 
   const { data, error } = await supabase
     .from("check_ins")
-    .select("*, symptoms(*)")
+    .select("*, symptoms(*), medication_logs(*, medications(name))")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -300,7 +300,59 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
     }
   }
 
-  // Step 5: extract + embed + store significant health event chunks (non-blocking)
+  // Step 5: auto-log any mentioned medications against user's active med list
+  if (extracted.medications_mentioned && extracted.medications_mentioned.length > 0 && data) {
+    try {
+      const { data: activeMeds } = await supabase
+        .from("medications")
+        .select("id, name")
+        .eq("user_id", user_id)
+        .eq("active", true);
+
+      if (activeMeds && activeMeds.length > 0) {
+        const today = new Date().toISOString().split("T")[0];
+        for (const mention of extracted.medications_mentioned) {
+          const mentionLower = mention.name.toLowerCase();
+          const match = activeMeds.find((m) =>
+            m.name.toLowerCase().includes(mentionLower) ||
+            mentionLower.includes(m.name.toLowerCase())
+          );
+          if (match) {
+            // Upsert: check if log exists for today
+            const { data: existing } = await supabase
+              .from("medication_logs")
+              .select("id")
+              .eq("user_id", user_id)
+              .eq("medication_id", match.id)
+              .eq("scheduled_date", today)
+              .maybeSingle();
+
+            if (existing) {
+              await supabase
+                .from("medication_logs")
+                .update({ taken: mention.taken, source: "text", check_in_id: data.id, notes: mention.notes })
+                .eq("id", existing.id);
+            } else {
+              await supabase.from("medication_logs").insert({
+                user_id: user_id,
+                medication_id: match.id,
+                check_in_id: data.id,
+                taken: mention.taken,
+                scheduled_date: today,
+                source: "text",
+                notes: mention.notes,
+              });
+            }
+            console.log(`Auto-logged medication "${match.name}" (taken=${mention.taken}) for check-in ${data.id}`);
+          }
+        }
+      }
+    } catch (medErr) {
+      console.error("Failed to auto-log medications:", (medErr as Error).message);
+    }
+  }
+
+  // Step 6: extract + embed + store significant health event chunks (non-blocking)
   chunkAndStoreCheckin(transcript, data.id, user_id).catch((err) =>
     console.error("Checkin chunking failed:", err.message),
   );

@@ -22,6 +22,7 @@ export interface CheckIn {
     audio_url: string | null;
     summary: string;
     symptoms?: Symptom[];
+    medication_logs?: MedicationLog[];
     flagged: boolean;
     flag_reason: string;
 }
@@ -43,4 +44,31 @@ export interface Document {
     summary: string | null;
     flagged: boolean;
     created_at: string;
+}
+
+export interface Medication {
+    id: string;
+    name: string;
+    dosage: string | null;
+    frequency: string;
+    time_of_day: string | null;
+    instructions: string | null;
+    active: boolean;
+}
+
+export interface MedicationTodayItem {
+    id: string;
+    name: string;
+    dosage: string | null;
+    time_of_day: string | null;
+    taken: boolean;
+    log_id: string | null;
+}
+
+export interface MedicationLog {
+    id: string;
+    medication_id: string;
+    taken: boolean;
+    source: string;
+    medications: { name: string };
 }

@@ -34,18 +34,41 @@ router.get("/", async (req: Request, res: Response) => {
             ? checkins.reduce((s, c) => s + (c.energy || 0), 0) / checkins.length
             : 0;
 
-        // 2. Adherence (past 30 days)
+        // 2. Adherence (past 30 days) — medication-based if user has meds, otherwise check-in-based
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const { count: adherenceCount, error: adherenceError } = await supabase
-            .from("check_ins")
-            .select("*", { count: 'exact', head: true })
+        const thirtyDaysAgoDate = thirtyDaysAgo.toISOString().split("T")[0];
+
+        let adherence = 0;
+
+        // Check if user has active medications
+        const { count: medCount } = await supabase
+            .from("medications")
+            .select("*", { count: "exact", head: true })
             .eq("user_id", userId)
-            .gte("created_at", thirtyDaysAgo.toISOString());
+            .eq("active", true);
 
-        if (adherenceError) throw adherenceError;
+        if (medCount && medCount > 0) {
+            // Medication-based adherence: taken logs / (active meds * 30 days)
+            const { count: takenCount } = await supabase
+                .from("medication_logs")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId)
+                .eq("taken", true)
+                .gte("scheduled_date", thirtyDaysAgoDate);
 
-        const adherence = Math.min(Math.round(((adherenceCount || 0) / 30) * 100), 100);
+            adherence = Math.min(Math.round(((takenCount || 0) / (medCount * 30)) * 100), 100);
+        } else {
+            // Fallback: check-in count adherence
+            const { count: adherenceCount, error: adherenceError } = await supabase
+                .from("check_ins")
+                .select("*", { count: 'exact', head: true })
+                .eq("user_id", userId)
+                .gte("created_at", thirtyDaysAgo.toISOString());
+
+            if (adherenceError) throw adherenceError;
+            adherence = Math.min(Math.round(((adherenceCount || 0) / 30) * 100), 100);
+        }
 
         // 3. Streak (simple approximation: number of checkins in last 7 days)
         const streak = checkins.length;

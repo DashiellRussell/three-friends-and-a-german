@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CHECKINS } from "@/lib/mock-data";
 import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
 import { ActivityGrid } from "./activity-grid";
+import { MedicationTodayItem } from "./types";
 
 interface CriticalAlert {
   id: string;
@@ -65,6 +66,42 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
       )
       .catch(console.error);
   }
+
+  const [todayMeds, setTodayMeds] = useState<MedicationTodayItem[]>([]);
+  const [medsLoading, setMedsLoading] = useState(true);
+
+  const fetchTodayMeds = useCallback(() => {
+    if (!user?.id) return;
+    fetch(`${backendUrl}/api/medications/today`, { headers: { "x-user-id": user.id } })
+      .then((res) => res.json())
+      .then((data) => setTodayMeds(data.medications || []))
+      .catch(console.error)
+      .finally(() => setMedsLoading(false));
+  }, [user?.id, backendUrl]);
+
+  useEffect(() => {
+    fetchTodayMeds();
+  }, [fetchTodayMeds]);
+
+  const toggleMed = useCallback(async (medId: string, currentTaken: boolean) => {
+    if (!user?.id) return;
+    // Optimistic update
+    setTodayMeds((prev) =>
+      prev.map((m) => (m.id === medId ? { ...m, taken: !currentTaken } : m))
+    );
+    try {
+      await fetch(`${backendUrl}/api/medications/${medId}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ taken: !currentTaken }),
+      });
+    } catch {
+      // Revert on failure
+      setTodayMeds((prev) =>
+        prev.map((m) => (m.id === medId ? { ...m, taken: currentTaken } : m))
+      );
+    }
+  }, [user?.id, backendUrl]);
 
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,6 +269,59 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
           </div>
         ))}
       </div>
+
+      {/* Today's Medications */}
+      {todayMeds.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-zinc-100 bg-white p-4 transition-all hover:border-zinc-200 hover:shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-zinc-900">Today&apos;s Medications</span>
+            <span className="text-[11px] text-zinc-400">
+              {todayMeds.filter((m) => m.taken).length} of {todayMeds.length} taken
+            </span>
+          </div>
+          {medsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-600" />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {todayMeds.map((med) => (
+                <button
+                  key={med.id}
+                  onClick={() => toggleMed(med.id, med.taken)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-zinc-50 active:bg-zinc-100"
+                  style={{ minHeight: 52 }}
+                >
+                  {/* Checkbox */}
+                  <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                    med.taken
+                      ? "border-emerald-500 bg-emerald-500"
+                      : "border-zinc-300"
+                  }`}>
+                    {med.taken && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className={`text-[14px] font-medium transition-colors ${
+                      med.taken ? "text-zinc-400 line-through" : "text-zinc-900"
+                    }`}>
+                      {med.name}
+                    </div>
+                    {(med.dosage || med.time_of_day) && (
+                      <div className="text-[11px] text-zinc-400">
+                        {[med.dosage, med.time_of_day].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Energy sparkline */}
       <div className="mb-4 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
