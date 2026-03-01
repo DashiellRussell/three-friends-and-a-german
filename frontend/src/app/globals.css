@@ -77,3 +77,108 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* ── Holographic sphere animations ── */
+@keyframes morphSphere {
+  0%,
+  100% {
+    border-radius: 42% 58% 52% 48% / 45% 55% 45% 55%;
+  }
+  25% {
+    border-radius: 55% 45% 48% 52% / 52% 48% 55% 45%;
+  }
+  50% {
+    border-radius: 48% 52% 55% 45% / 58% 42% 48% 52%;
+  }
+  75% {
+    border-radius: 52% 48% 45% 55% / 48% 52% 42% 58%;
+  }
+}
+
+@keyframes rotateSphereGradient {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spherePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes sphereFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes sphereGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 40px 8px rgba(139, 92, 246, 0.15),
+      0 0 80px 20px rgba(59, 130, 246, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 60px 15px rgba(139, 92, 246, 0.25),
+      0 0 120px 40px rgba(59, 130, 246, 0.12);
+  }
+}
+
+@keyframes sphereGlowSpeaking {
+  0%,
+  100% {
+    box-shadow: 0 0 50px 12px rgba(168, 85, 247, 0.25),
+      0 0 100px 30px rgba(192, 132, 252, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 70px 20px rgba(168, 85, 247, 0.4),
+      0 0 140px 50px rgba(192, 132, 252, 0.18);
+  }
+}
+
+@keyframes sphereGlowDone {
+  0%,
+  100% {
+    box-shadow: 0 0 40px 8px rgba(16, 185, 129, 0.15),
+      0 0 80px 20px rgba(52, 211, 153, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 60px 15px rgba(16, 185, 129, 0.25),
+      0 0 120px 40px rgba(52, 211, 153, 0.12);
+  }
+}
+
+@keyframes orbitalRing {
+  0% {
+    transform: rotateX(70deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(70deg) rotateZ(360deg);
+  }
+}
+
+@keyframes innerShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

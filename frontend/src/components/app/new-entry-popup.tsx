@@ -1,8 +1,18 @@
 "use client";
 
-import Link from "next/link";
-
-export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCallMe?: () => void }) {
+export function NewEntryPopup({
+  onClose,
+  onVoice,
+  onCallMe,
+  onChat,
+  onUpload,
+}: {
+  onClose: () => void;
+  onVoice?: () => void;
+  onCallMe?: () => void;
+  onChat?: () => void;
+  onUpload?: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-100 flex flex-col justify-end">
       <div onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-sm" />
@@ -20,8 +30,8 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
 
         <div className="flex flex-col gap-2.5">
           {/* Voice — primary */}
-          <Link
-            href="/checkin/voice"
+          <button
+            onClick={() => { onClose(); onVoice?.(); }}
             className="flex w-full items-center gap-4 rounded-2xl bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800 active:scale-[0.99]"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
@@ -48,7 +58,7 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
                 ~2 min conversation · recommended
               </div>
             </div>
-          </Link>
+          </button>
 
           {/* Call me */}
           <button
@@ -73,15 +83,15 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
                 Call me
               </div>
               <div className="mt-0.5 text-xs text-zinc-400">
-                Kira calls your phone
+                Tessera calls your phone
               </div>
             </div>
           </button>
 
           <div className="flex gap-2.5">
             {/* Text */}
-            <Link
-              href="/checkin/text"
+            <button
+              onClick={() => { onClose(); onChat?.(); }}
               className="flex flex-1 items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-50">
@@ -103,11 +113,11 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
                 </div>
                 <div className="text-[11px] text-zinc-400">Type or chat</div>
               </div>
-            </Link>
+            </button>
 
             {/* Upload */}
-            <Link
-              href="/checkin/upload"
+            <button
+              onClick={() => { onClose(); onUpload?.(); }}
               className="flex flex-1 items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-50">
@@ -131,7 +141,7 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
                 </div>
                 <div className="text-[11px] text-zinc-400">PDF, image</div>
               </div>
-            </Link>
+            </button>
           </div>
         </div>
       </div>

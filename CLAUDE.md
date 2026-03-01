@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Kira — AI Health Companion** built for the Mistral AI Worldwide Hackathon (Sydney). Provides voice-based daily health check-ins, proactive outbound health calls, text check-ins with AI conversation, medical document upload and analysis, critical symptom flagging, health trend tracking, and doctor report PDF generation.
+**Tessera — AI Health Companion** built for the Mistral AI Worldwide Hackathon (Sydney). Provides voice-based daily health check-ins, proactive outbound health calls, text check-ins with AI conversation, medical document upload and analysis, critical symptom flagging, health trend tracking, and doctor report PDF generation.
 
 ## Commands
 

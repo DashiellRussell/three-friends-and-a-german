@@ -64,7 +64,7 @@ function LoginScreen() {
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           </svg>
         </div>
-        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">Kira</h1>
+        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">Tessera</h1>
         <p className="mt-1 text-[14px] text-zinc-400">Your AI health companion</p>
       </div>
 
@@ -104,6 +104,8 @@ function DemoApp() {
   const [inputOpen, setInputOpen] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [callMode, setCallMode] = useState(false);
+  const [chatMode, setChatMode] = useState(false);
+  const [uploadMode, setUploadMode] = useState(false);
 
   if (loading) {
     return (
@@ -138,7 +140,7 @@ function DemoApp() {
             </svg>
           </div>
           <span className="text-sm font-semibold tracking-tight text-zinc-900">
-            Kira
+            Tessera
           </span>
         </div>
         <div className="w-12" />
@@ -204,22 +206,27 @@ function DemoApp() {
         )}
       </div>
 
-      {/* Input overlay — voice/call mode or new entry popup */}
-      {inputOpen && (voiceMode || callMode) && (
+      {/* Input overlay — voice/call/chat/upload mode or new entry popup */}
+      {inputOpen && (voiceMode || callMode || chatMode || uploadMode) && (
         <InputOverlay
-          onClose={() => { setInputOpen(false); setVoiceMode(false); setCallMode(false); }}
+          onClose={() => { setInputOpen(false); setVoiceMode(false); setCallMode(false); setChatMode(false); setUploadMode(false); }}
           startInVoiceMode={voiceMode}
           startInCallMode={callMode}
+          startInChatMode={chatMode}
+          startInUploadMode={uploadMode}
           onNavigate={(navTab, subTab) => {
             setTab(navTab as Tab);
             if (navTab === "log" && subTab) setLogSubTab(subTab as "log" | "files" | "reports");
           }}
         />
       )}
-      {inputOpen && !voiceMode && !callMode && (
+      {inputOpen && !voiceMode && !callMode && !chatMode && !uploadMode && (
         <NewEntryPopup
           onClose={() => setInputOpen(false)}
+          onVoice={() => { setVoiceMode(true); setInputOpen(true); }}
           onCallMe={() => { setCallMode(true); setInputOpen(true); }}
+          onChat={() => { setChatMode(true); setInputOpen(true); }}
+          onUpload={() => { setUploadMode(true); setInputOpen(true); }}
         />
       )}
     </div>

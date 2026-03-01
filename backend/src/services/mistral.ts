@@ -112,9 +112,9 @@ export async function generateConversationContext(
     messages: [
       {
         role: "system",
-        content: `You are generating a system prompt for a conversational health AI assistant. 
-        
-Your output will be injected directly as a system prompt into a voice-based AI that is about to start a daily health check-in conversation with the user.
+        content: `You are generating a system prompt for Tessera, a warm AI health companion.
+
+Your output will be injected directly as a system prompt into Tessera, a voice-based AI that is about to start a daily health check-in conversation with the user.
 
 The system prompt you write should:
 - Be written in second person, addressing the conversational AI (e.g. "The user has been..." or "You know that...")

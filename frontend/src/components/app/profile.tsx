@@ -86,7 +86,7 @@ export function Profile() {
         throw new Error(body.error || `Call failed (${res.status})`);
       }
       setCallStatus("done");
-      showToast("Kira is calling you now", "success", "Pick up your phone to start the check-in");
+      showToast("Tessera is calling you now", "success", "Pick up your phone to start the check-in");
       setTimeout(() => setCallStatus("idle"), 5000);
     } catch (err) {
       const msg = (err as Error).message;
@@ -302,10 +302,10 @@ export function Profile() {
               callStatus === "done" ? "text-emerald-600/60" : callStatus === "error" ? "text-red-600/60" : "text-white/50"
             }`}>
               {callStatus === "done"
-                ? "Kira is calling your phone"
+                ? "Tessera is calling your phone"
                 : callStatus === "error"
                   ? callError
-                  : "Kira calls your phone for a hands-free check-in"}
+                  : "Tessera calls your phone for a hands-free check-in"}
             </div>
           </div>
         </button>
@@ -377,7 +377,7 @@ export function Profile() {
 
       {/* Version */}
       <div className="mt-6 text-center text-[11px] text-zinc-300">
-        Kira Health v0.1.0
+        Tessera Health v0.1.0
       </div>
     </div>
   );

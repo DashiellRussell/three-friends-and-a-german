@@ -65,7 +65,7 @@ function WaitlistSection() {
         </h2>
         <p className="mx-auto mb-8 max-w-md text-zinc-400">
           We&apos;re launching soon. Join the waitlist and get early access to
-          Kira — your AI health companion.
+          Tessera — your AI health companion.
         </p>
 
         {submitted ? (
@@ -177,7 +177,7 @@ export default function Home() {
               <Mic className="h-4 w-4 text-white" strokeWidth={1.8} />
             </div>
             <span className="text-[15px] font-semibold tracking-tight text-zinc-900">
-              Kira
+              Tessera
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -274,7 +274,7 @@ export default function Home() {
             Everything between appointments
           </h2>
           <p className="mx-auto mt-4 max-w-md text-zinc-500">
-            Your doctor gets 10 minutes. Kira captures the other 10,070.
+            Your doctor gets 10 minutes. Tessera captures the other 10,070.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -303,7 +303,7 @@ export default function Home() {
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900">
               <Mic className="h-3 w-3 text-white" strokeWidth={2} />
             </div>
-            <span className="text-sm font-medium text-zinc-400">Kira</span>
+            <span className="text-sm font-medium text-zinc-400">Tessera</span>
           </div>
           <p className="text-xs text-zinc-400">
             Built for the Mistral AI Worldwide Hackathon, Sydney. This app does

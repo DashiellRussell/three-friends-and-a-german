@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../services/supabase";
-import { mistral } from "../services/mistral";
+import { mistral, generateConversationContext, CheckInExtraction } from "../services/mistral";
+import { conversationalInstructions } from "./checkin";
 import {
   getSignedUrl,
   initiateOutboundCall,
@@ -69,7 +70,7 @@ async function parseTranscriptWithMistral(transcript: string): Promise<ParsedChe
     messages: [
       {
         role: "system",
-        content: `You are a medical data extraction assistant. Extract structured health data from a voice check-in transcript between a patient and Kira (an AI health companion).
+        content: `You are a medical data extraction assistant. Extract structured health data from a voice check-in transcript between a patient and Tessera (an AI health companion).
 
 Return a JSON object with these fields:
 {
@@ -474,12 +475,55 @@ router.get("/signed-url", async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch user profile for dynamic variables
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("display_name, conditions, allergies, phone_number")
-      .eq("id", userId)
-      .single();
+    // Fetch user profile + recent check-ins in parallel
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [profileResult, checkInsResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("display_name, conditions, allergies, phone_number")
+        .eq("id", userId)
+        .single(),
+      supabase
+        .from("check_ins")
+        .select("created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason")
+        .eq("user_id", userId)
+        .gte("created_at", sevenDaysAgo.toISOString())
+        .order("created_at", { ascending: true }),
+    ]);
+
+    const profile = profileResult.data;
+
+    // Build conversation context from recent check-ins (non-blocking — voice still works without it)
+    let conversationContext = "";
+    try {
+      const checkIns = checkInsResult.data;
+      if (checkIns && checkIns.length > 0) {
+        const now = new Date();
+        const mapped = checkIns.map((entry) => {
+          const entryDate = new Date(entry.created_at);
+          const diffMs = now.getTime() - entryDate.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+          let dateLabel: string;
+          if (diffDays === 0) {
+            dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+          } else if (diffDays === 1) {
+            dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+          } else {
+            dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
+          }
+
+          return { date: dateLabel, data: entry as unknown as CheckInExtraction };
+        });
+
+        const generatedContext = await generateConversationContext(mapped);
+        conversationContext = `${generatedContext}\n\n${conversationalInstructions}`;
+      }
+    } catch (ctxErr) {
+      console.warn("[voice] Failed to generate conversation context:", (ctxErr as Error).message);
+    }
 
     // Try to get signed URL, but also return agent_id as fallback
     // (SDK v0.14.x: signedUrl → WebSocket, agentId → WebRTC via LiveKit)
@@ -497,6 +541,7 @@ router.get("/signed-url", async (req: Request, res: Response) => {
         user_name: profile?.display_name || "there",
         conditions: profile?.conditions?.join(", ") || "none listed",
         allergies: profile?.allergies?.join(", ") || "none listed",
+        conversation_context: conversationContext || "No recent check-ins. This is a general wellness check-in. Be warm, introduce yourself as Tessera, and have a natural conversation about how they're feeling today. When they share something, ask a brief follow-up to draw out more detail before moving on.",
       },
     });
   } catch (err) {
@@ -515,53 +560,74 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch recent check-ins for context (last 5)
-    const { data: recentCheckins } = await supabase
-      .from("check_ins")
-      .select("transcript, notes, mood_rating, energy_level, created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    // Fetch recent check-ins + symptoms in parallel for context
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Fetch recent symptoms (not dismissed)
-    const { data: symptoms } = await supabase
-      .from("symptoms")
-      .select("name, severity, body_area, is_critical, alert_level, alert_message, created_at")
-      .eq("user_id", userId)
-      .eq("dismissed", false)
-      .order("created_at", { ascending: false })
-      .limit(10);
+    const [checkInsResult, symptomsResult] = await Promise.all([
+      supabase
+        .from("check_ins")
+        .select("created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason")
+        .eq("user_id", userId)
+        .gte("created_at", sevenDaysAgo.toISOString())
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("symptoms")
+        .select("name, severity, body_area, is_critical, alert_level, created_at")
+        .eq("user_id", userId)
+        .eq("dismissed", false)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
 
-    // Build a concise health summary for the agent
-    let recentHealthSummary = "";
+    // Build conversational context from check-in history
+    let outboundContext = "";
+    try {
+      const checkIns = checkInsResult.data;
+      if (checkIns && checkIns.length > 0) {
+        const now = new Date();
+        const mapped = checkIns.map((entry) => {
+          const entryDate = new Date(entry.created_at);
+          const diffMs = now.getTime() - entryDate.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (symptoms && symptoms.length > 0) {
-      const symptomLines = symptoms.map(
-        (s) => `- ${s.name} (severity: ${s.severity}/10, ${s.body_area || "general"}, ${s.is_critical ? "CRITICAL" : s.alert_level || "info"}, reported: ${new Date(s.created_at).toLocaleDateString()})`,
-      );
-      recentHealthSummary += `Active symptoms:\n${symptomLines.join("\n")}\n\n`;
+          let dateLabel: string;
+          if (diffDays === 0) {
+            dateLabel = `Today at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+          } else if (diffDays === 1) {
+            dateLabel = `Yesterday at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+          } else {
+            dateLabel = `${entryDate.toLocaleDateString("en-AU", { weekday: "long" })} at ${entryDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })} (${diffDays} days ago)`;
+          }
+
+          return { date: dateLabel, data: entry as unknown as CheckInExtraction };
+        });
+
+        outboundContext = await generateConversationContext(mapped);
+      }
+
+      // Append any active symptom alerts the AI should be aware of
+      const symptoms = symptomsResult.data;
+      if (symptoms && symptoms.length > 0) {
+        const criticalSymptoms = symptoms.filter((s) => s.is_critical);
+        const warningSymptoms = symptoms.filter((s) => s.alert_level === "warning" && !s.is_critical);
+        if (criticalSymptoms.length > 0 || warningSymptoms.length > 0) {
+          outboundContext += `\n\nActive health alerts to gently follow up on: ${[...criticalSymptoms, ...warningSymptoms].map((s) => s.name).join(", ")}.`;
+        }
+      }
+    } catch (ctxErr) {
+      console.warn("[voice] Failed to generate outbound context:", (ctxErr as Error).message);
     }
 
-    if (recentCheckins && recentCheckins.length > 0) {
-      const checkinLines = recentCheckins.map((c) => {
-        const date = new Date(c.created_at).toLocaleDateString();
-        const parts = [];
-        if (c.mood_rating) parts.push(`mood: ${c.mood_rating}/10`);
-        if (c.energy_level) parts.push(`energy: ${c.energy_level}/10`);
-        if (c.notes) parts.push(c.notes.slice(0, 100));
-        return `- ${date}: ${parts.join(", ") || "check-in recorded"}`;
-      });
-      recentHealthSummary += `Recent check-ins:\n${checkinLines.join("\n")}`;
+    if (!outboundContext) {
+      outboundContext = "No recent check-ins on file. This is a general wellness check-in.";
     }
 
-    if (!recentHealthSummary) {
-      recentHealthSummary = "No recent check-ins or symptoms on file. This is a general wellness check-in.";
-    }
-
-    // Merge dynamic variables with health context
+    // Merge dynamic variables with conversational context + instructions
     const enrichedVariables = {
       ...(dynamic_variables || {}),
-      recent_health_summary: recentHealthSummary,
+      recent_health_summary: `${outboundContext}\n\n${conversationalInstructions}`,
+      conversation_context: `${outboundContext}\n\n${conversationalInstructions}`,
     };
 
     const { conversationId, callSid } = await initiateOutboundCall(
