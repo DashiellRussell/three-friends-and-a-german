@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 import { ActivityGrid } from "../activity-grid";
 import { SymptomGraph } from "../symptom-graph";
 
@@ -11,9 +12,6 @@ import { AlertsPanel } from "./AlertsPanel";
 import { StatCards } from "./StatCards";
 import { LatestEntry } from "./LatestEntry";
 import { CriticalAlert, DashboardData } from "./types";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 export function Dashboard({
   goTo,
@@ -34,9 +32,7 @@ export function Dashboard({
   // Fetch critical alerts
   useEffect(() => {
     if (!user) return;
-    fetch(`${BACKEND_URL}/api/symptoms/alerts`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch("/api/symptoms/alerts")
       .then((res) => res.json())
       .then((body) => setAlerts(body.alerts || []))
       .catch(console.error);
@@ -45,9 +41,7 @@ export function Dashboard({
   // Fetch dashboard summary
   useEffect(() => {
     if (!user?.id) return;
-    fetch(`${BACKEND_URL}/api/dashboard`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch("/api/dashboard")
       .then((r) => r.json())
       .then((d) => {
         setData(d);
@@ -60,24 +54,18 @@ export function Dashboard({
   }, [user?.id]);
 
   function dismiss(id: string) {
-    fetch(`${BACKEND_URL}/api/symptoms/${id}/dismiss`, {
+    apiFetch(`/api/symptoms/${id}/dismiss`, {
       method: "PATCH",
-      headers: { "x-user-id": user!.id },
     })
       .then(() => setAlerts((prev) => prev.filter((a) => a.id !== id)))
       .catch(console.error);
   }
 
   function undismissAll() {
-    fetch(`${BACKEND_URL}/api/symptoms/undismiss-critical`, {
+    apiFetch("/api/symptoms/undismiss-critical", {
       method: "POST",
-      headers: { "x-user-id": user!.id },
     })
-      .then(() =>
-        fetch(`${BACKEND_URL}/api/symptoms/alerts`, {
-          headers: { "x-user-id": user!.id },
-        }),
-      )
+      .then(() => apiFetch("/api/symptoms/alerts"))
       .then((res) => res.json())
       .then((body) => setAlerts(body.alerts || []))
       .catch(console.error);

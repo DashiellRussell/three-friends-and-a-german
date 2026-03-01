@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 export function ActivityGrid({ userId }: { userId: string }) {
   const [activityMap, setActivityMap] = useState<Record<string, number>>({});
@@ -11,9 +12,7 @@ export function ActivityGrid({ userId }: { userId: string }) {
   useEffect(() => {
     if (!userId) return;
 
-    const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-    fetch(`${backendUrl}/api/checkin`, { headers: { "x-user-id": userId } })
+    apiFetch("/api/checkin")
       .then((res) => res.json())
       .then((data) => {
         const checkIns = Array.isArray(data) ? data : data.check_ins || [];

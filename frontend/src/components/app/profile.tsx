@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 import { Toggle, Pill, useToast } from "./shared";
 import { Medication } from "./types";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 interface Document {
   id: string;
@@ -36,6 +36,7 @@ function formatEmergencyContact(ec: { name: string; phone: string; relationship:
 }
 
 export function Profile() {
+  const router = useRouter();
   const { user, logout } = useUser();
   const [n1, setN1] = useState(true);
   const [n2, setN2] = useState(true);
@@ -61,17 +62,13 @@ export function Profile() {
     if (!user) return;
     setDocsLoading(true);
     setMedsLoading(true);
-    fetch(`${BACKEND_URL}/api/documents`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch("/api/documents")
       .then((res) => res.json())
       .then((data) => setDocuments(Array.isArray(data) ? data : data.documents || []))
       .catch(console.error)
       .finally(() => setDocsLoading(false));
 
-    fetch(`${BACKEND_URL}/api/medications`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch("/api/medications")
       .then((res) => res.json())
       .then((data) => setMedications(data.medications || []))
       .catch(console.error)
@@ -81,9 +78,8 @@ export function Profile() {
   const addMedication = useCallback(async () => {
     if (!user || !newMedName.trim()) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/medications`, {
+      const res = await apiFetch("/api/medications", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": user.id },
         body: JSON.stringify({
           name: newMedName.trim(),
           dosage: newMedDosage.trim() || null,
@@ -108,9 +104,8 @@ export function Profile() {
   const removeMedication = useCallback(async (id: string) => {
     if (!user) return;
     try {
-      await fetch(`${BACKEND_URL}/api/medications/${id}`, {
+      await apiFetch(`/api/medications/${id}`, {
         method: "DELETE",
-        headers: { "x-user-id": user.id },
       });
       setMedications((prev) => prev.filter((m) => m.id !== id));
       showToast("Medication removed", "success");
@@ -127,12 +122,8 @@ export function Profile() {
       if (!user.phone_number) {
         throw new Error("Add a phone number to your profile first.");
       }
-      const res = await fetch(`${BACKEND_URL}/api/voice/outbound-call`, {
+      const res = await apiFetch("/api/voice/outbound-call", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": user.id,
-        },
         body: JSON.stringify({
           phone_number: user.phone_number,
           dynamic_variables: {
@@ -191,7 +182,10 @@ export function Profile() {
           <div className="text-[16px] font-semibold text-zinc-900">{displayName}</div>
           <div className="mt-0.5 text-[13px] text-zinc-400">{user?.email}</div>
         </div>
-        <button className="shrink-0 rounded-xl border border-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-500 transition-colors hover:border-zinc-200 hover:text-zinc-700">
+        <button
+          onClick={() => router.push("/onboarding?edit=true")}
+          className="shrink-0 rounded-xl border border-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-500 transition-colors hover:border-zinc-200 hover:text-zinc-700"
+        >
           Edit
         </button>
       </div>

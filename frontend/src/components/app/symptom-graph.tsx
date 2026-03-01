@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
-import { useUser } from "@/lib/user-context";
-
-const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+import { apiFetch } from "@/lib/api";
 
 const CATEGORY_COLORS: Record<string, string> = {
   neurological: "#8b5cf6",
@@ -48,7 +46,6 @@ interface GraphData {
 }
 
 export function SymptomGraph() {
-  const { user } = useUser();
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [data, setData] = useState<GraphData | null>(null);
@@ -57,17 +54,14 @@ export function SymptomGraph() {
   const simulationRef = useRef<d3.Simulation<GraphNode, d3.SimulationLinkDatum<GraphNode>> | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    fetch(`${API}/api/checkin/graph`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch("/api/checkin/graph")
       .then((r) => r.json())
       .then((d) => {
         setData(d);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [user]);
+  }, []);
 
   const renderGraph = useCallback(() => {
     if (!data || !svgRef.current || !containerRef.current) return;

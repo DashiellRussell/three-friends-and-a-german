@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { Toggle, SegmentedControl } from "./shared";
 
 interface ReportConfigProps {
   setView: (v: "entries" | "report-config" | "generating" | "report") => void;
-  userId: string;
 }
 
-export function ReportConfig({ setView, userId }: ReportConfigProps) {
+export function ReportConfig({ setView }: ReportConfigProps) {
   const [reportRange, setReportRange] = useState("week");
   const [reportDetail, setReportDetail] = useState("summary");
   const [incCheckins, setIncCheckins] = useState(true);
@@ -34,12 +34,8 @@ export function ReportConfig({ setView, userId }: ReportConfigProps) {
         ...(reportContext.trim() && { context: reportContext.trim() }),
       });
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/reports/generate?${params.toString()}`,
-        {
-          method: "GET",
-          headers: { "x-user-id": userId },
-        },
+      const response = await apiFetch(
+        `/api/reports/generate?${params.toString()}`,
       );
 
       if (!response.ok) throw new Error("Failed to generate report");

@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useConversation } from "@elevenlabs/react";
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 import { useToast } from "./shared";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 type Mode = null | "voice" | "chat" | "upload" | "calling";
 type TranscriptMsg = { role: "user" | "agent"; text: string };
@@ -88,9 +87,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
 
     try {
       console.log("[voice] 1. Fetching signed URL from backend...");
-      const res = await fetch(`${BACKEND_URL}/api/voice/signed-url`, {
-        headers: { "x-user-id": userId },
-      });
+      const res = await apiFetch("/api/voice/signed-url");
       console.log("[voice] 2. Backend response status:", res.status);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -167,12 +164,8 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
         .map((m) => `${m.role === "user" ? "User" : "Agent"}: ${m.text}`)
         .join("\n");
 
-      await fetch(`${BACKEND_URL}/api/checkin`, {
+      await apiFetch("/api/checkin", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": userId,
-        },
         body: JSON.stringify({
           input_mode: "voice",
           transcript: fullTranscript,
@@ -187,7 +180,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
     } finally {
       setSaving(false);
     }
-  }, [transcript, userId, showToast]);
+  }, [transcript, showToast]);
 
   // Auto-save when agent triggers end_conversation
   useEffect(() => {
@@ -204,9 +197,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
 
     try {
       // Fetch user profile to get phone number
-      const profileRes = await fetch(`${BACKEND_URL}/api/profiles`, {
-        headers: { "x-user-id": userId },
-      });
+      const profileRes = await apiFetch("/api/profiles");
       if (!profileRes.ok) throw new Error("Failed to fetch profile");
       const profile = await profileRes.json();
 
@@ -214,12 +205,8 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
         throw new Error("No phone number on profile. Add one in Settings first.");
       }
 
-      const res = await fetch(`${BACKEND_URL}/api/voice/outbound-call`, {
+      const res = await apiFetch("/api/voice/outbound-call", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": userId,
-        },
         body: JSON.stringify({
           phone_number: profile.phone_number,
           dynamic_variables: {
@@ -245,7 +232,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
       setCallStatus("error");
       showToast(msg, "error");
     }
-  }, [userId, showToast]);
+  }, [showToast]);
 
   // Auto-start the requested mode (wait for userId to be available)
   const hasAutoStarted = useRef(false);
@@ -301,9 +288,8 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
       formData.append("file_name", file.name);
       formData.append("document_type", "other");
 
-      const res = await fetch(`${BACKEND_URL}/api/documents/upload`, {
+      const res = await apiFetch("/api/documents/upload", {
         method: "POST",
-        headers: { "x-user-id": userId },
         body: formData,
       });
 
@@ -322,7 +308,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
       setUploadStage("error");
       showToast(msg, "error");
     }
-  }, [userId, showToast]);
+  }, [showToast]);
 
   const sendChat = () => {
     if (!chatText.trim()) return;
@@ -817,6 +803,9 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
           <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600">Done</button>
         </div>
 
+        <div className="mx-5 mt-1 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-600">
+          AI replies are simulated — live AI chat coming soon
+        </div>
         <div ref={textChatRef} className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-3">
           {chatMsgs.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`} style={{ animation: "fadeUp 0.2s ease" }}>

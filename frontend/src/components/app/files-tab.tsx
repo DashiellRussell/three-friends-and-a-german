@@ -2,9 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Document } from "./types";
-import { useUser } from "@/lib/user-context";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+import { apiFetch } from "@/lib/api";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
     lab_report: "Lab Report",
@@ -20,13 +18,11 @@ interface FilesTabProps {
 }
 
 export function FilesTab({ documents = [], onDocumentsChanged }: FilesTabProps) {
-    const { user } = useUser();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadState, setUploadState] = useState<"idle" | "uploading" | "processing" | "success" | "error">("idle");
     const [uploadError, setUploadError] = useState<string | null>(null);
 
     const handleUpload = useCallback(async (file: File) => {
-        if (!user) return;
         setUploadState("uploading");
         setUploadError(null);
 
@@ -46,9 +42,8 @@ export function FilesTab({ documents = [], onDocumentsChanged }: FilesTabProps) 
             formData.append("file_name", file.name);
             formData.append("document_type", "other");
 
-            const res = await fetch(`${BACKEND_URL}/api/documents/upload`, {
+            const res = await apiFetch("/api/documents/upload", {
                 method: "POST",
-                headers: { "x-user-id": user.id },
                 body: formData,
             });
 
@@ -66,14 +61,11 @@ export function FilesTab({ documents = [], onDocumentsChanged }: FilesTabProps) 
             setUploadError((err as Error).message);
             setUploadState("error");
         }
-    }, [user, onDocumentsChanged]);
+    }, [onDocumentsChanged]);
 
     const handleDownload = async (docId: string) => {
-        if (!user) return;
         try {
-            const res = await fetch(`${BACKEND_URL}/api/documents/${docId}/download`, {
-                headers: { "x-user-id": user.id },
-            });
+            const res = await apiFetch(`/api/documents/${docId}/download`);
             if (!res.ok) throw new Error("Failed to get download URL");
             const { url } = await res.json();
             window.open(url, "_blank");

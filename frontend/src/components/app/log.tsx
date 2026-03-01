@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 import { CheckIn, Report, Document } from "./types";
 import {
   ReportConfig,
@@ -42,14 +43,11 @@ export function Log({
   const [reports, setReports] = useState<Report[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
 
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-
   useEffect(() => {
     if (!user) return;
 
     // Fetch user check-ins
-    fetch(`${backendUrl}/api/checkin`, { headers: { "x-user-id": user.id } })
+    apiFetch("/api/checkin")
       .then((res) => res.json())
       .then((data) =>
         setCheckIns(Array.isArray(data) ? data : data.check_ins || []),
@@ -57,19 +55,19 @@ export function Log({
       .catch(console.error);
 
     // Fetch user generated reports
-    fetch(`${backendUrl}/api/reports`, { headers: { "x-user-id": user.id } })
+    apiFetch("/api/reports")
       .then((res) => res.json())
       .then((data) => setReports(data.reports || []))
       .catch(console.error);
 
     // Fetch user documents
-    fetch(`${backendUrl}/api/documents`, { headers: { "x-user-id": user.id } })
+    apiFetch("/api/documents")
       .then((res) => res.json())
       .then((data) =>
         setDocuments(Array.isArray(data) ? data : data.documents || []),
       )
       .catch(console.error);
-  }, [user, view, backendUrl]);
+  }, [user, view]);
 
   useEffect(() => {
     if (!targetCheckinId || checkIns.length === 0) return;
@@ -91,13 +89,13 @@ export function Log({
 
   const refetchDocuments = useCallback(() => {
     if (!user) return;
-    fetch(`${backendUrl}/api/documents`, { headers: { "x-user-id": user.id } })
+    apiFetch("/api/documents")
       .then((res) => res.json())
       .then((data) =>
         setDocuments(Array.isArray(data) ? data : data.documents || []),
       )
       .catch(console.error);
-  }, [user, backendUrl]);
+  }, [user]);
 
   // Detail view
   if (selectedCheckIn) {
@@ -110,7 +108,7 @@ export function Log({
   }
 
   if (view === "report-config") {
-    return <ReportConfig setView={setView} userId={user?.id || ""} />;
+    return <ReportConfig setView={setView} />;
   }
 
   if (view === "generating") {

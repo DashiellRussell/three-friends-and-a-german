@@ -1,23 +1,16 @@
 "use client";
 
 import { Report } from "./types";
-import { useUser } from "@/lib/user-context";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+import { apiFetch } from "@/lib/api";
 
 interface ReportsTabProps {
     reports: Report[];
 }
 
 export function ReportsTab({ reports }: ReportsTabProps) {
-    const { user } = useUser();
-
     const handleDownload = async (reportId: string) => {
-        if (!user) return;
         try {
-            const res = await fetch(`${BACKEND_URL}/api/reports/${reportId}/download`, {
-                headers: { "x-user-id": user.id },
-            });
+            const res = await apiFetch(`/api/reports/${reportId}/download`);
             if (!res.ok) throw new Error("Failed to get download URL");
             const { url } = await res.json();
             window.open(url, "_blank");

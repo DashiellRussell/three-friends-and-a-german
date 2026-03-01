@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 import { SegmentedControl, Sparkline } from "./shared";
 import { SymptomGraph } from "./symptom-graph";
 
 export function Trends() {
-  const { user } = useUser();
   const [range, setRange] = useState("week");
   const [trendsData, setTrendsData] = useState<
     | {
@@ -20,13 +19,8 @@ export function Trends() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.id) return;
     setIsLoading(true);
-    const BACKEND_URL =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-    fetch(`${BACKEND_URL}/api/trends?range=${range}`, {
-      headers: { "x-user-id": user.id },
-    })
+    apiFetch(`/api/trends?range=${range}`)
       .then((r) => r.json())
       .then((d) => {
         setTrendsData(d);
@@ -36,7 +30,7 @@ export function Trends() {
         console.error(err);
         setIsLoading(false);
       });
-  }, [user?.id, range]);
+  }, [range]);
 
   const energyD = trendsData ? trendsData.map((c) => c.energy) : [];
   const sleepD = trendsData ? trendsData.map((c) => c.sleep) : [];
