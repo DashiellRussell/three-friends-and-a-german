@@ -1,16 +1,28 @@
 /**
  * Demo Data Seed Script — Populates the database with a realistic 21-day health story.
  *
- * Creates a patient persona (Amara) with:
- * - 16 check-ins over 3 weeks (fatigue → anemia diagnosis → iron supplements → migraine)
- * - 2 medical documents (blood test results, pharmacy prescription)
+ * Creates a patient persona (Margaret "Maggie" Thornton) with:
+ * - 15 check-ins over 3 weeks (visual disturbances → hypertension spike → diabetic workup →
+ *   ophthalmologist referral → curtain-vision TIA warning → tailored specialist report)
+ * - 2 medical documents (blood test / HbA1c results, GP referral letter to ophthalmologist)
  * - Embeddings for every check-in and document (enabling RAG vector search)
  * - Document chunks for fine-grained retrieval (via documentPipeline.ts)
  *
- * This seed data demonstrates the full RAG pipeline:
- * - Pattern detection finds the recurring headache/fatigue cluster
- * - Cross-reference search connects symptoms to the blood test results
- * - Report generation produces a doctor-ready PDF with AI insights
+ * Story arc — designed to showcase every core pitch feature:
+ *
+ *   PHONE-FIRST PERSONA: Maggie is 72, lives alone, has a landline but no smartphone.
+ *   Tessera calls her every morning — she never opens an app.
+ *
+ *   SEMANTIC CLUSTER (days 1–7): hypertension spike + floaters/flashing lights + diabetes
+ *   → embedding similarity search surfaces the BP-vision-diabetes cluster before any single
+ *   symptom is severe enough to trigger a standard alert.
+ *
+ *   WARNING #1 (day 7): pattern detection flags the combined cluster.
+ *   WARNING #2 (day 16): single critical event — transient "curtain across vision"
+ *   (amaurosis fugax pattern), triggers urgent alert.
+ *
+ *   TAILORED REPORT (day 21): ophthalmologist appointment tomorrow. Report queries ONLY
+ *   vision-related check-ins + BP pattern + HbA1c. Foot tingling excluded.
  *
  * Usage:
  *   npx ts-node src/scripts/seed-demo-data.ts                  # create demo user
@@ -36,20 +48,23 @@ const userIdArg = args.find((a) => a.startsWith("--user-id="));
 const TARGET_USER_ID = userIdArg ? userIdArg.split("=")[1] : null;
 
 // ── Patient persona ──
-const AMARA_PROFILE = {
-  email: "amara.demo@Tessera.health",
-  display_name: "Amara Wanjiku",
-  date_of_birth: "1992-03-15",
+// Margaret "Maggie" Thornton — 72-year-old woman, lives alone in a small regional town.
+// Has a landline but no smartphone. Tessera calls her every morning at 8am.
+// She never opens an app — the phone call IS the interface.
+const MARGARET_PROFILE = {
+  email: "margaret.demo@Tessera.health",
+  display_name: "Margaret Thornton",
+  date_of_birth: "1953-04-22",
   gender: "Female",
-  blood_type: "O+",
+  blood_type: "A+",
   conditions: [
-    "suspected anemia (unconfirmed)",
-    "recurring migraines",
-    "mild asthma",
+    "Type 2 diabetes (diagnosed 2011)",
+    "hypertension (diagnosed 2015)",
+    "mild cataracts (left eye, monitoring)",
   ],
-  allergies: ["penicillin"],
-  phone_number: "+254712345678",
-  timezone: "Africa/Nairobi",
+  allergies: ["sulfonamides"],
+  phone_number: "+61412345678",
+  timezone: "Australia/Sydney",
   language: "en",
   onboarding_completed: true,
   onboarding_step: 4,
@@ -67,168 +82,172 @@ interface DayPlan {
 }
 
 const CHECKIN_PLANS: DayPlan[] = [
-  // Week 1: Increasing fatigue, dizziness, headaches
+  // ── Week 1: Something is quietly wrong ──
+  // Maggie attributes everything to "just getting older".
+  // The system is the first to notice a pattern forming.
   {
     day: 1,
     storyContext:
-      "Amara is feeling ok but a bit tired today. She walked to the market and felt slightly winded. Slept about 6 hours. No major complaints yet.",
+      "Maggie is feeling okay but a bit flat this morning. Slept about 6.5 hours but woke up with a mild headache that's mostly gone now. She mentions she had a couple of floaters in her vision yesterday — little spots drifting across her left eye — but says she's had those before and they usually go away. Blood pressure on her home monitor was a bit high this morning, 158 over 94, but she says it goes up and down. She took her metformin and amlodipine with breakfast as usual.",
     expectedMood: "okay",
     expectedEnergy: 5,
-    expectedSleep: 6,
-    hasSymptoms: false,
+    expectedSleep: 6.5,
+    hasSymptoms: true,
     flagged: false,
   },
   {
     day: 2,
     storyContext:
-      "Amara had a headache this morning that lasted a few hours. She feels more tired than usual. She mentions she had to rest after walking to the water pump because she felt dizzy. Slept 5.5 hours.",
-    expectedMood: "tired",
-    expectedEnergy: 4,
-    expectedSleep: 5.5,
+      "Maggie slept a bit better, about 7 hours. Feeling reasonably well this morning. The headache is back though, dull, sitting behind her eyes. She mentions the floaters in her left eye are still there and seem a little more noticeable than usual — she sees them when she looks at a white wall or out the window. She checked her blood pressure again: 162 over 96. She is not particularly alarmed but wonders if she should adjust her medication.",
+    expectedMood: "okay",
+    expectedEnergy: 5,
+    expectedSleep: 7,
     hasSymptoms: true,
     flagged: false,
   },
   {
     day: 3,
     storyContext:
-      "Amara is feeling a bit better today, no headache. But she still feels weak and low energy. She ate some ugali and greens. Slept about 6 hours.",
+      "Maggie woke up feeling dizzy this morning when she got out of bed — had to hold the wall for a few seconds. She says it passed quickly and she feels fine now. No floaters today so far. Headache is mild. Energy is average. Slept about 6 hours. She mentions she has been a bit more tired in the evenings lately but puts it down to the weather.",
     expectedMood: "okay",
     expectedEnergy: 4,
     expectedSleep: 6,
-    hasSymptoms: false,
+    hasSymptoms: true,
     flagged: false,
   },
   {
     day: 5,
     storyContext:
-      "Amara had another bad headache and felt dizzy when she stood up quickly. She is worried about feeling so tired all the time. Difficulty walking to the water pump again. Sleep was poor, about 5 hours.",
+      "Maggie is more tired today. She has had a persistent headache all morning, behind her eyes and into her neck. She mentions that last night she noticed a brief episode where her vision in the left eye went a bit blurry at the edges — like looking through foggy glass — for maybe a minute, then cleared. She is a little worried about that. Her home blood pressure reading this morning was 171 over 101, which she says is the highest she has seen in months. She also mentions her feet have felt tingly and a bit numb on and off this week — mainly at night. Slept 5.5 hours.",
     expectedMood: "worried",
-    expectedEnergy: 3,
-    expectedSleep: 5,
-    hasSymptoms: true,
-    flagged: true,
-  },
-  {
-    day: 6,
-    storyContext:
-      "Amara went to the mobile clinic today and got a blood test done. She is waiting for results. Feeling exhausted. Had a mild headache in the afternoon. Sleep was about 5.5 hours.",
-    expectedMood: "anxious",
     expectedEnergy: 3,
     expectedSleep: 5.5,
     hasSymptoms: true,
-    flagged: false,
+    flagged: true,
   },
   {
     day: 7,
     storyContext:
-      "Amara got her blood test results. The nurse said her hemoglobin is borderline low. She feels relieved to have an answer but worried about what it means. Energy is very low today. Slept 6 hours.",
-    expectedMood: "relieved",
+      "Maggie had another dizzy spell yesterday — had to sit down in the kitchen for a few minutes. This morning she noticed flashing lights in the corner of her left eye, like small sparks or camera flashes, for about 30 seconds. She says it was a bit frightening. Her blood pressure is still elevated, 168 over 99. She has a headache again. Feet are still tingling. Slept about 6 hours. She says she has been meaning to call her GP but keeps forgetting. She wonders out loud if all these things are connected.",
+    expectedMood: "worried",
     expectedEnergy: 3,
     expectedSleep: 6,
     hasSymptoms: true,
     flagged: true,
+    // FLAG #1: Semantic cluster — persistent hypertension (158→162→171→168) +
+    // visual disturbances across multiple check-ins (floaters day1,2 + blurry edge day5 +
+    // photopsia/flashing lights day7) + T2DM patient = high-priority referral signal.
+    // System surfaces: "Recurring visual symptoms combined with sustained BP elevation
+    // in a diabetic patient may indicate hypertensive or diabetic retinopathy. We have
+    // notified your emergency contact and recommend contacting your GP today."
   },
 
-  // Week 2: Started iron supplements, stomach cramps, breathlessness episode
+  // ── Week 2: Daughter gets involved, GP visit, blood tests ──
   {
     day: 8,
     storyContext:
-      "Amara started taking iron supplements today as the clinic suggested. She's hopeful it will help. Feeling tired but slightly more optimistic. Slept about 6 hours.",
-    expectedMood: "hopeful",
+      "Maggie's daughter Sarah received the alert from Tessera yesterday and drove down to take Maggie to the GP this morning. Maggie sounds relieved — slightly embarrassed that everyone got worried, but glad she went. The GP examined her eyes with an ophthalmoscope, was concerned about the floaters and flashing lights in the context of her diabetes and blood pressure, and ordered blood tests including an HbA1c and a fasting lipid panel. He also adjusted her amlodipine dose. The GP is referring her to an ophthalmologist. Maggie is a bit anxious but feels like things are finally being looked at properly. Slept 6.5 hours.",
+    expectedMood: "anxious",
     expectedEnergy: 4,
-    expectedSleep: 6,
+    expectedSleep: 6.5,
     hasSymptoms: false,
     flagged: false,
   },
   {
     day: 9,
     storyContext:
-      "The iron tablets are causing stomach cramps. Amara feels nauseous after taking them. But she thinks her energy is slightly better than last week. Headache came back briefly. Slept 6.5 hours.",
+      "Maggie got her blood test results back today — the GP called her. She says her HbA1c is 8.4 percent, which the doctor said is too high and means her blood sugar has not been well controlled for the past few months. Her cholesterol is also a bit elevated. The GP is going to adjust her diabetes medication. Maggie sounds a little deflated but says she understands now why she has been feeling so tired. No new visual symptoms today. Feet still tingling but she is less worried now that the GP knows. Blood pressure was better this morning, 152 over 90 — the new dose might be helping. Slept 7 hours.",
     expectedMood: "okay",
     expectedEnergy: 5,
-    expectedSleep: 6.5,
+    expectedSleep: 7,
     hasSymptoms: true,
     flagged: false,
   },
   {
-    day: 10,
+    day: 11,
     storyContext:
-      "Amara had an episode of breathlessness after carrying water. She had to sit down and use her inhaler. The stomach cramps from iron continue. She is a bit scared about the breathing. Slept about 6 hours.",
-    expectedMood: "scared",
-    expectedEnergy: 4,
-    expectedSleep: 6,
+      "Maggie received the formal referral letter to see Dr. Priya Nair, ophthalmologist, in two weeks. She sounds more settled today. Energy is slightly better. No floaters or flashing lights this week. Headache is much lighter — she says the new blood pressure dose is definitely helping. She mentions her feet are still tingling especially at night and wonders if that is also from the diabetes. The GP had mentioned neuropathy as a possibility. Slept 7 hours.",
+    expectedMood: "okay",
+    expectedEnergy: 5,
+    expectedSleep: 7,
     hasSymptoms: true,
-    flagged: true,
+    flagged: false,
   },
   {
     day: 12,
     storyContext:
-      "Amara is feeling better than earlier this week. The stomach cramps are still there but less severe. She took her iron supplement with food as someone suggested. Energy feels a bit better today. Slept 7 hours.",
+      "Maggie is feeling better than she has in a couple of weeks. Energy is up a little. No vision episodes. Blood pressure on the home monitor was 144 over 88 this morning, the best it has been in a while. She is happy about that. She mentions she has started being more careful about her diet — cutting back on bread and rice as the GP suggested. Feet are still a bit tingly but less than earlier in the week. Slept 7.5 hours.",
     expectedMood: "better",
-    expectedEnergy: 5,
-    expectedSleep: 7,
+    expectedEnergy: 6,
+    expectedSleep: 7.5,
     hasSymptoms: true,
     flagged: false,
   },
   {
     day: 14,
     storyContext:
-      "Amara had a headache today but it was milder than before. She went to the pharmacy and got her iron prescription renewed. No breathlessness episode this week since the first one. Stomach cramps are manageable. Slept 6.5 hours.",
-    expectedMood: "okay",
-    expectedEnergy: 5,
-    expectedSleep: 6.5,
-    hasSymptoms: true,
+      "Maggie is having a good day. No headache, no floaters, no flashing lights. Energy is the best it has been all month. She mentions she uploaded the blood test results and the ophthalmologist referral letter to the app with help from her daughter Sarah. She is looking forward to the ophthalmologist appointment in a week. She also mentions she has been taking her metformin more consistently — Sarah set a phone alarm for her. Slept 7.5 hours.",
+    expectedMood: "good",
+    expectedEnergy: 6,
+    expectedSleep: 7.5,
+    hasSymptoms: false,
     flagged: false,
   },
 
-  // Week 3: Energy improving, migraine with aura, doctor appointment prep
+  // ── Week 3: Vision mostly stable — then the curtain event ──
   {
     day: 15,
     storyContext:
-      "Amara is noticing her energy is genuinely getting better. She could walk to the pump and back without resting. The iron supplements are still causing mild stomach issues but nothing too bad. Slept 7 hours.",
+      "Maggie is feeling well today. She and Sarah had dinner together last night. Energy is good, slept about 7.5 hours. Blood pressure this morning was 141 over 87. No visual disturbances. Feet tingling is mild and mainly just at night now. She is getting ready for the ophthalmologist appointment this week and mentions she hopes the doctor will have a full picture of everything that has been happening with her eyes.",
     expectedMood: "good",
-    expectedEnergy: 6,
-    expectedSleep: 7,
+    expectedEnergy: 7,
+    expectedSleep: 7.5,
     hasSymptoms: true,
     flagged: false,
   },
   {
     day: 16,
     storyContext:
-      "Amara had a bad headache with visual disturbance — she saw zigzag lines before the headache started. It was very intense and she had to lie down in a dark room for hours. She is frightened by the visual symptoms. Slept 5 hours because of the pain.",
+      "Maggie sounds frightened this morning. Yesterday afternoon she was watching television when suddenly it was like a dark curtain came down across the top half of her left eye's vision — she could not see anything through the top of that eye for about 45 seconds, then it cleared completely. She says it was unlike anything she has experienced before and scared her badly. She also had a brief headache right after. Her blood pressure at home this morning is 166 over 98 — it has gone back up. She did not call emergency services because it cleared and she did not think it was a heart attack. Slept only 4.5 hours because she was frightened and anxious. Feet are tingling.",
     expectedMood: "scared",
     expectedEnergy: 3,
-    expectedSleep: 5,
+    expectedSleep: 4.5,
     hasSymptoms: true,
     flagged: true,
+    // FLAG #2 — CRITICAL: Transient monocular vision loss ("curtain" pattern) is a
+    // classic presentation of amaurosis fugax, which can be a warning sign of an
+    // impending stroke or central retinal artery occlusion. This is a time-sensitive
+    // emergency flag regardless of prior history.
+    // System triggers: URGENT ALERT — immediate GP or emergency contact.
+    // Also notifies daughter Sarah.
   },
   {
     day: 18,
     storyContext:
-      "Amara is recovering from the migraine episode two days ago. She feels drained but the headache is gone. Energy is moderate. Stomach cramps are getting better. She is sleeping better, about 7 hours.",
+      "Maggie went to the emergency department the evening of the curtain episode after Tessera's urgent alert and Sarah's call. The ED doctor ran an ECG and CT scan — no stroke was found. She was told it may have been a TIA warning sign and to urgently follow up with the ophthalmologist and her GP. She is home now and sounds calmer but still a bit shaken. She is resting and her energy is low. No further vision episodes since the curtain. Blood pressure this morning 148 over 91. Slept 7 hours last night — the first proper sleep in days. Feet tingling as usual.",
     expectedMood: "tired",
+    expectedEnergy: 4,
+    expectedSleep: 7,
+    hasSymptoms: true,
+    flagged: false,
+  },
+  {
+    day: 19,
+    storyContext:
+      "Maggie is feeling a little better today. She is relieved nothing was found in the emergency scan but is taking this very seriously now. Her ophthalmologist appointment has been moved up to tomorrow — Sarah called to expedite it given the curtain episode. Energy is moderate. No visual symptoms today. Blood pressure 145 over 88. She mentions she wants to make sure the eye doctor has a complete picture of everything — all the floaters, the flashing lights, the blurry patches, the curtain — and also her blood pressure readings and the diabetes results. She sounds grateful that Tessera has been recording everything.",
+    expectedMood: "okay",
     expectedEnergy: 5,
     expectedSleep: 7,
     hasSymptoms: false,
     flagged: false,
   },
   {
-    day: 19,
-    storyContext:
-      "Amara is feeling pretty good today. Her energy is the best it has been in weeks. She managed to do her chores without needing to rest. She mentions she has a doctor appointment next week and wants to bring a report summarizing her health over the past few weeks. Slept 7.5 hours.",
-    expectedMood: "good",
-    expectedEnergy: 7,
-    expectedSleep: 7.5,
-    hasSymptoms: false,
-    flagged: false,
-  },
-  {
     day: 21,
     storyContext:
-      "Amara is preparing for her doctor appointment tomorrow. She wants to make sure the doctor knows about her headaches with visual disturbance, the anemia diagnosis, the iron supplements and stomach cramps, and the breathing episode. She is feeling hopeful. Energy is good. Slept 7 hours.",
+      "Maggie has her ophthalmologist appointment in a few hours. She sounds calm and prepared. Sarah is driving her. She mentions she wants to bring a clear summary for the doctor — specifically the eye symptoms, her blood pressure pattern over the past three weeks, and the HbA1c result. She mentions she is glad she does not need to try to remember all of this from memory — she says she would have forgotten half of it. Energy is good. Slept 7.5 hours. Blood pressure this morning 143 over 86.",
     expectedMood: "hopeful",
-    expectedEnergy: 7,
-    expectedSleep: 7,
+    expectedEnergy: 6,
+    expectedSleep: 7.5,
     hasSymptoms: false,
     flagged: false,
   },
@@ -244,64 +263,114 @@ interface DocumentPlan {
 
 const DOCUMENT_PLANS: DocumentPlan[] = [
   {
-    day: 7,
+    day: 9,
     type: "lab_report",
-    fileName: "blood_test_results_mobile_clinic.pdf",
-    content: `MOBILE CLINIC BLOOD TEST RESULTS
-Patient: Amara Wanjiku
-Date: ${getDateForDay(7).toLocaleDateString("en-AU")}
-Facility: Kericho Mobile Health Unit
+    fileName: "blood_test_results_hba1c_panel.pdf",
+    content: `PATHOLOGY REPORT
+Patient: Margaret Thornton  
+DOB: 22/04/1953
+Date Collected: ${getDateForDay(8).toLocaleDateString("en-AU")}
+Date Reported: ${getDateForDay(9).toLocaleDateString("en-AU")}
+Requesting Physician: Dr. Alan Marsh, Bankstown Medical Centre
+Lab: NSW Pathology — Western Sydney
 
-COMPLETE BLOOD COUNT (CBC):
-- Hemoglobin: 11.2 g/dL (Reference: 12.0-15.5 g/dL) — LOW
-- Hematocrit: 34.1% (Reference: 36-46%) — LOW
-- RBC Count: 4.0 x10^12/L (Reference: 4.0-5.5) — Low normal
-- MCV: 78 fL (Reference: 80-100 fL) — LOW (microcytic)
-- MCH: 26.5 pg (Reference: 27-33 pg) — LOW
-- MCHC: 32.8 g/dL (Reference: 32-36 g/dL) — Normal
-- WBC: 6.2 x10^9/L (Reference: 4.0-11.0) — Normal
-- Platelets: 285 x10^9/L (Reference: 150-400) — Normal
+GLYCAEMIC CONTROL:
+- HbA1c (Glycated Haemoglobin): 8.4% (Reference: <7.0% for diabetic patients) — HIGH
+  Estimated average glucose: 11.0 mmol/L
+  Clinical note: HbA1c has increased from 7.6% (12 months ago). Current glycaemic
+  control is suboptimal. Consider medication review and dietary reinforcement.
 
-IRON STUDIES:
-- Serum Iron: 45 mcg/dL (Reference: 60-170 mcg/dL) — LOW
-- Ferritin: 8 ng/mL (Reference: 12-150 ng/mL) — LOW
-- TIBC: 420 mcg/dL (Reference: 250-370 mcg/dL) — HIGH
-- Transferrin Saturation: 10.7% (Reference: 20-50%) — LOW
+FASTING LIPID PANEL:
+- Total Cholesterol: 5.8 mmol/L (Reference: <5.5) — BORDERLINE HIGH
+- LDL Cholesterol: 3.6 mmol/L (Reference: <3.5 for T2DM patients) — BORDERLINE HIGH
+- HDL Cholesterol: 1.2 mmol/L (Reference: >1.3 for women) — LOW
+- Triglycerides: 2.1 mmol/L (Reference: <1.7) — HIGH
+- Total Cholesterol/HDL Ratio: 4.8 (Reference: <4.0) — HIGH
 
-INTERPRETATION:
-Results consistent with iron deficiency anemia. Recommend iron supplementation (ferrous sulfate 325mg daily) and dietary changes. Follow-up blood test in 8 weeks. If symptoms worsen or no improvement, refer to district hospital.
+RENAL FUNCTION (routine diabetic monitoring):
+- eGFR: 61 mL/min/1.73m2 (Reference: >60) — Low normal, monitor
+- Urine Albumin/Creatinine Ratio: 3.8 mg/mmol (Reference: <3.5) — BORDERLINE
+  Clinical note: Microalbuminuria borderline. Recheck in 3 months. Early indicator
+  of diabetic nephropathy — relevant given poorly controlled HbA1c.
 
-Clinician: Nurse Mary Achieng, Kericho Mobile Health Unit`,
+COMPLETE BLOOD COUNT:
+- Haemoglobin: 13.1 g/dL (Reference: 12.0–15.5) — Normal
+- WBC: 7.1 x10^9/L (Reference: 4.0–11.0) — Normal
+- Platelets: 240 x10^9/L (Reference: 150–400) — Normal
+
+CLINICAL INTERPRETATION:
+Suboptimal glycaemic control (HbA1c 8.4%) in context of T2DM with hypertension.
+Elevated triglycerides and borderline LDL increase cardiovascular and microvascular
+risk (retinopathy, nephropathy, neuropathy). Recommend: (1) metformin dose review /
+addition of SGLT-2 inhibitor, (2) dietary counselling, (3) urgent ophthalmology
+referral to evaluate for diabetic retinopathy given patient's visual symptoms,
+(4) repeat HbA1c in 3 months.
+
+Reported by: Dr. K. Patel, Clinical Biochemist, NSW Pathology`,
   },
   {
-    day: 14,
-    type: "prescription",
-    fileName: "pharmacy_prescription_iron.pdf",
-    content: `PHARMACY PRESCRIPTION RECORD
-Patient: Amara Wanjiku
-Date: ${getDateForDay(14).toLocaleDateString("en-AU")}
-Pharmacy: Kericho Town Pharmacy
+    day: 11,
+    type: "referral_letter",
+    fileName: "gp_referral_ophthalmologist_dr_nair.pdf",
+    content: `SPECIALIST REFERRAL LETTER
 
-PRESCRIPTION:
-1. Ferrous Sulfate 325mg tablets
-   - Take 1 tablet daily with food (to reduce stomach upset)
-   - Duration: 3 months (90 tablets dispensed)
-   - Note: Take with orange juice or vitamin C to improve absorption
-   - Avoid taking with tea, coffee, or milk (reduces absorption)
+From: Dr. Alan Marsh, MBBS FRACGP
+      Bankstown Medical Centre
+      22 Chapel Road, Bankstown NSW 2200
+      Tel: (02) 9790 XXXX
 
-2. Salbutamol Inhaler 100mcg (refill)
-   - Use as needed for breathing difficulty
-   - 2 puffs as required, maximum 8 puffs per day
-   - Remaining from previous prescription: adequate
+To:   Dr. Priya Nair, FRANZCO
+      Sydney Eye Specialists
+      Level 3, 275 George St, Sydney NSW 2000
 
-PHARMACIST NOTES:
-- Patient reported stomach cramps with iron tablets taken on empty stomach
-- Advised to take with meals to reduce GI side effects
-- If stomach issues persist, consider switching to ferrous gluconate (gentler)
-- Patient allergic to PENICILLIN — noted in records
-- Advised follow-up with clinic in 6-8 weeks for repeat blood test
+Date: ${getDateForDay(11).toLocaleDateString("en-AU")}
 
-Dispensed by: Joseph Kibet, Pharmacist`,
+RE: Margaret Thornton, DOB 22/04/1953
+
+Dear Dr. Nair,
+
+Thank you for seeing Mrs. Thornton on a semi-urgent basis. I am referring her for
+comprehensive ophthalmological assessment in the context of the following:
+
+PRESENTING CONCERNS:
+Mrs. Thornton is a 72-year-old woman with a 12-year history of Type 2 diabetes
+mellitus and a 9-year history of hypertension. Over the past 10 days she has
+reported the following visual symptoms, progressively:
+
+  - Persistent floaters in the left eye (days 1–7, ongoing)
+  - Transient blurring at the peripheral visual field of the left eye (~1 min,
+    self-resolving)
+  - Photopsia (flashing lights, left eye) — one episode of approximately 30 seconds
+  - MOST CONCERNING: one episode of transient monocular vision loss in the left eye
+    ("curtain coming down" description) lasting approximately 45 seconds, followed
+    by complete resolution. Patient subsequently presented to ED; CT head unremarkable,
+    ECG normal, no acute infarct identified.
+
+RELEVANT BACKGROUND:
+  - HbA1c: 8.4% (recent result — copy attached). Glycaemic control suboptimal.
+  - BP: persistently elevated past 3 weeks (range 158–171/94–101 systolic/diastolic),
+    now partially controlled on amended amlodipine dose (146/89 most recent reading).
+  - Triglycerides elevated, LDL borderline high.
+  - Patient also reporting bilateral distal foot paraesthesia (tingling), worse at night,
+    consistent with early peripheral diabetic neuropathy.
+  - Known mild cataract left eye (previous optometry report 2022, no intervention).
+  - Current medications: Metformin 1000mg BD, Amlodipine 10mg daily,
+    Atorvastatin 20mg nocte.
+  - Allergies: Sulfonamides.
+
+CLINICAL CONCERN:
+The combination of uncontrolled T2DM, sustained hypertension, and progressive
+unilateral visual symptoms (floaters, photopsia, transient monocular vision loss)
+raises significant concern for diabetic retinopathy, hypertensive retinopathy,
+and/or early central retinal vascular pathology. The transient monocular vision
+loss episode warrants urgent fundoscopy and angiography to exclude retinal
+arterial or venous occlusion.
+
+I would appreciate your assessment and management recommendations.
+
+Yours sincerely,
+Dr. Alan Marsh, MBBS FRACGP
+Bankstown Medical Centre`,
   },
 ];
 
@@ -311,9 +380,10 @@ function getDateForDay(day: number): Date {
   const baseDate = new Date(now);
   baseDate.setDate(now.getDate() - (21 - day)); // day 21 = today, day 1 = 20 days ago
 
-  // Set to morning EAT (UTC+3) = 7-9am EAT = 4-6am UTC
-  const hour = 4 + Math.floor(Math.random() * 2); // 4-5 UTC = 7-8 EAT
-  const minute = Math.floor(Math.random() * 60);
+  // Set to morning AEST (UTC+10) = 8am AEST = 10pm UTC previous day
+  // Tessera calls Maggie every morning at 8am
+  const hour = 22; // 10pm UTC = 8am AEST next day
+  const minute = Math.floor(Math.random() * 15); // slight variation: 8:00–8:15am
   baseDate.setHours(hour, minute, 0, 0);
 
   return baseDate;
@@ -324,6 +394,9 @@ async function delay(ms: number): Promise<void> {
 }
 
 // ── Generate transcript via Mistral ──
+// Generates a realistic phone call transcript between the Tessera AI and Maggie.
+// Maggie is elderly, speaks warmly and conversationally. She doesn't use medical terms.
+// She calls the AI "the phone" or "the health line" — she doesn't think of it as an app.
 async function generateTranscript(plan: DayPlan): Promise<string> {
   const client = mistral as any;
   const response = await client.chat.complete({
@@ -331,15 +404,17 @@ async function generateTranscript(plan: DayPlan): Promise<string> {
     messages: [
       {
         role: "system",
-        content: `You are generating a realistic voice check-in transcript for a health companion app demo. The speaker is Amara, a 34-year-old woman in rural Kenya. She speaks conversational English with occasional simple phrasing.
+        content: `You are generating a realistic voice transcript for a health companion demo.
 
-Write 2-4 sentences as if Amara is speaking naturally to her AI health companion "Tessera" during a morning check-in. Use natural, non-clinical language — the way a real person would describe how they feel. Do NOT use formal medical terminology. Do NOT use a greeting or introduction — just jump straight into how she's feeling.
+The AI health companion (Tessera) calls Margaret "Maggie" Thornton every morning at 8am on her landline. Write ONLY Maggie's side of the call — her spoken response to being asked how she is feeling today. Do NOT include any lines from the AI or any speaker labels.
 
-Context for today: ${plan.storyContext}`,
+Maggie is 72, lives alone in regional New South Wales. She speaks in a warm, unhurried, slightly old-fashioned way using plain everyday language — never medical jargon. She might say "funny little spots in my vision" instead of "floaters", or "that heavy feeling behind my eyes" instead of "headache". She is polite and a bit chatty. Write 3–5 natural sentences as if she is speaking aloud.
+
+Context for today's call: ${plan.storyContext}`,
       },
       {
         role: "user",
-        content: `Generate Amara's check-in transcript for day ${plan.day} of her health journey.`,
+        content: `Generate the call transcript for day ${plan.day} of Margaret's health journey.`,
       },
     ],
   });
@@ -354,6 +429,9 @@ Context for today: ${plan.storyContext}`,
 // ── Main ──
 async function main() {
   console.log("=== Tessera Health Companion — Demo Data Seeder ===\n");
+  console.log(
+    "Persona: Margaret 'Maggie' Thornton, 72 — regional NSW, landline only.\n",
+  );
 
   let userId: string;
 
@@ -361,7 +439,6 @@ async function main() {
     userId = TARGET_USER_ID;
     console.log(`Using specified user: ${userId}`);
 
-    // Verify user exists
     const { data: existing } = await supabase
       .from("profiles")
       .select("id, display_name")
@@ -374,11 +451,10 @@ async function main() {
     }
     console.log(`Found user: ${existing.display_name}\n`);
   } else {
-    // Find or create demo user
     const { data: existing } = await supabase
       .from("profiles")
       .select("id")
-      .eq("email", AMARA_PROFILE.email)
+      .eq("email", MARGARET_PROFILE.email)
       .single();
 
     if (existing) {
@@ -387,7 +463,7 @@ async function main() {
     } else {
       const { data: created, error } = await supabase
         .from("profiles")
-        .insert(AMARA_PROFILE)
+        .insert(MARGARET_PROFILE)
         .select("id")
         .single();
 
@@ -404,7 +480,6 @@ async function main() {
   if (CLEAN || !TARGET_USER_ID) {
     console.log("Cleaning existing data for user...");
 
-    // Delete in dependency order
     await supabase.from("checkin_chunks").delete().eq("user_id", userId);
     await supabase.from("symptoms").delete().eq("user_id", userId);
     await supabase
@@ -424,13 +499,12 @@ async function main() {
     console.log("Cleaned.\n");
   }
 
-  // Update profile with Amara's health details if seeding for a specific user
   if (TARGET_USER_ID) {
     await supabase
       .from("profiles")
       .update({
-        conditions: AMARA_PROFILE.conditions,
-        allergies: AMARA_PROFILE.allergies,
+        conditions: MARGARET_PROFILE.conditions,
+        allergies: MARGARET_PROFILE.allergies,
       })
       .eq("id", userId);
   }
@@ -446,31 +520,41 @@ async function main() {
     const createdAt = getDateForDay(plan.day);
     console.log(`  Day ${plan.day} (${createdAt.toLocaleDateString()}):`);
 
-    // Generate transcript
     console.log("    Generating transcript...");
     const transcript = await generateTranscript(plan);
     console.log(`    Transcript: "${transcript.slice(0, 80)}..."`);
     await delay(200);
 
     // Mistral structured extraction: transcript → mood, energy, sleep, symptoms, flags
-    // The extracted summary is optimized for embedding quality (concise + semantically dense)
+    // Retries up to 3 times — Mistral occasionally drops structured output intermittently.
     console.log("    Extracting structured data...");
-    const extracted = await extractCheckinData(transcript);
+    let extracted: Awaited<ReturnType<typeof extractCheckinData>> | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        extracted = await extractCheckinData(transcript);
+        break;
+      } catch (err) {
+        if (attempt === 3) throw err;
+        console.log(`    Extraction attempt ${attempt} failed, retrying...`);
+        await delay(1000);
+      }
+    }
+    if (!extracted)
+      throw new Error("extractCheckinData failed after 3 attempts");
     await delay(200);
 
-    // Generate 1024-dim vector from the clean summary — this is what powers
-    // pattern detection (clustering similar check-ins) and cross-reference search
-    // (finding check-ins related to a query like "headache" or "fatigue")
+    // Embed the clean summary — powers both pattern detection (clustering similar
+    // check-ins) and cross-reference search (e.g. "find all check-ins mentioning
+    // vision problems" or "show me BP readings over the past 3 weeks")
     console.log("    Embedding...");
     const embedding = await embedText(extracted.summary);
     await delay(200);
 
-    // Insert check-in
     const { data: checkin, error: ciError } = await supabase
       .from("check_ins")
       .insert({
         user_id: userId,
-        input_mode: "text",
+        input_mode: "voice", // Maggie's check-ins are always phone calls
         transcript,
         summary: extracted.summary,
         mood: extracted.mood,
@@ -493,7 +577,10 @@ async function main() {
     checkInCount++;
     console.log(`    Check-in created: ${checkin.id}`);
 
-    // Extract significant health events as chunks for RAG search
+    // Chunk and store significant health events for fine-grained RAG retrieval.
+    // These chunks are what power the tailored specialist report on day 21 —
+    // the ophthalmology report queries chunks semantically similar to "vision"
+    // and "blood pressure" while excluding unrelated entries (e.g. foot tingling).
     console.log("    Extracting checkin chunks...");
     try {
       const chunks = await chunkAndStoreCheckin(transcript, checkin.id, userId);
@@ -513,9 +600,8 @@ async function main() {
     }
     await delay(200);
 
-    // Create symptoms from extracted data if flagged or has symptoms
+    // Symptoms — only insert for flagged days with symptoms
     if (plan.hasSymptoms && extracted.flagged) {
-      // Use the extracted summary to create reasonable symptoms
       const symptomNames: string[] = [];
       const summary = extracted.summary.toLowerCase();
 
@@ -529,27 +615,51 @@ async function main() {
       )
         symptomNames.push("fatigue");
       if (
-        summary.includes("stomach") ||
-        summary.includes("cramp") ||
-        summary.includes("nause")
-      )
-        symptomNames.push("stomach cramps");
-      if (summary.includes("breath")) symptomNames.push("breathlessness");
-      if (
-        summary.includes("visual") ||
-        summary.includes("aura") ||
-        summary.includes("zigzag")
+        summary.includes("floater") ||
+        summary.includes("spot") ||
+        summary.includes("vision") ||
+        summary.includes("blurr") ||
+        summary.includes("visual")
       )
         symptomNames.push("visual disturbance");
+      if (summary.includes("flash") || summary.includes("light"))
+        symptomNames.push("photopsia");
+      if (summary.includes("curtain") || summary.includes("vision loss"))
+        symptomNames.push("transient monocular vision loss");
+      if (
+        summary.includes("tingle") ||
+        summary.includes("tingling") ||
+        summary.includes("numb") ||
+        summary.includes("feet")
+      )
+        symptomNames.push("peripheral tingling");
+      if (
+        summary.includes("blood pressure") ||
+        summary.includes("bp") ||
+        summary.includes("hypertension")
+      )
+        symptomNames.push("elevated blood pressure");
 
       if (symptomNames.length === 0 && plan.hasSymptoms) {
-        symptomNames.push("fatigue"); // fallback
+        symptomNames.push("fatigue");
       }
 
       for (const name of symptomNames) {
+        // Transient monocular vision loss is the highest-urgency symptom in this story
         const isCritical =
-          name === "visual disturbance" || name === "breathlessness";
-        const severity = isCritical ? 7 : name === "headache" ? 5 : 4;
+          name === "transient monocular vision loss" || name === "photopsia";
+
+        const severity =
+          name === "transient monocular vision loss"
+            ? 9
+            : name === "photopsia"
+              ? 7
+              : name === "visual disturbance" ||
+                  name === "elevated blood pressure"
+                ? 6
+                : name === "headache"
+                  ? 5
+                  : 4;
 
         const { error: sError } = await supabase.from("symptoms").insert({
           user_id: userId,
@@ -557,28 +667,35 @@ async function main() {
           name,
           severity,
           body_area:
-            name === "headache" || name === "visual disturbance"
+            name === "transient monocular vision loss" ||
+            name === "visual disturbance" ||
+            name === "photopsia" ||
+            name === "headache"
               ? "head"
-              : name === "breathlessness"
-                ? "chest"
-                : name === "stomach cramps"
-                  ? "abdomen"
+              : name === "elevated blood pressure"
+                ? "cardiovascular"
+                : name === "peripheral tingling"
+                  ? "extremities"
                   : "general",
           is_critical: isCritical,
           alert_level: isCritical
             ? "critical"
-            : severity >= 5
+            : severity >= 6
               ? "warning"
               : "info",
           alert_message: isCritical
-            ? `${name} reported — please consult a healthcare provider`
-            : null,
+            ? `${name} reported — please seek urgent medical attention and contact your GP or emergency services immediately`
+            : severity >= 6
+              ? `${name} reported — recommend discussing with your GP at your next appointment`
+              : null,
           created_at: createdAt.toISOString(),
         });
 
         if (!sError) {
           symptomCount++;
-          console.log(`    Symptom: ${name} (severity: ${severity})`);
+          console.log(
+            `    Symptom: ${name} (severity: ${severity}, critical: ${isCritical})`,
+          );
         }
       }
     }
@@ -595,8 +712,7 @@ async function main() {
     const createdAt = getDateForDay(docPlan.day);
     console.log(`  ${docPlan.fileName} (day ${docPlan.day}):`);
 
-    // Summarize
-    console.log("    Summarizing...");
+    console.log("    Summarising...");
     const client = mistral as any;
     const summaryResponse = await client.chat.complete({
       model: "mistral-large-latest",
@@ -604,7 +720,7 @@ async function main() {
         {
           role: "system",
           content:
-            "You are a medical document summarization assistant. Produce a concise 3-5 sentence summary of this medical document, focusing on key findings, diagnoses, and recommendations. Use simple language.",
+            "You are a medical document summarisation assistant. Produce a concise 3–5 sentence summary of this medical document, focusing on key findings, diagnoses, and recommendations. Use simple, plain language suitable for a non-specialist.",
         },
         { role: "user", content: docPlan.content },
       ],
@@ -614,20 +730,20 @@ async function main() {
     ).trim();
     await delay(200);
 
-    // Embed the full document text — this coarse-grained vector enables
-    // document-level similarity search. The fine-grained chunk embeddings
-    // (created by processDocument below) enable section-level matching.
+    // Embed the full document text for document-level similarity search.
+    // The fine-grained chunk embeddings (created by processDocument) enable
+    // section-level matching — e.g. the ophthalmology report query finds the
+    // HbA1c and BP sections specifically, not just the document as a whole.
     console.log("    Embedding...");
     const embedding = await embedText(docPlan.content);
     await delay(200);
 
-    // Insert document record with summary + embedding
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .insert({
         user_id: userId,
         file_name: docPlan.fileName,
-        file_url: "", // No actual file for seed data
+        file_url: "",
         file_type: "application/pdf",
         document_type: docPlan.type,
         summary,
@@ -644,7 +760,6 @@ async function main() {
 
     documentCount++;
     console.log(`    Document created: ${doc.id}`);
-
     console.log("");
   }
 
@@ -652,11 +767,40 @@ async function main() {
   const dateRange = `${getDateForDay(1).toLocaleDateString()} — ${getDateForDay(21).toLocaleDateString()}`;
   console.log("\n=== Seeding Complete ===");
   console.log(`  User ID:    ${userId}`);
+  console.log(
+    `  Persona:    Margaret "Maggie" Thornton (72, regional NSW, landline only)`,
+  );
   console.log(`  Check-ins:  ${checkInCount}`);
   console.log(`  Chunks:     ${chunkCount}`);
   console.log(`  Symptoms:   ${symptomCount}`);
   console.log(`  Documents:  ${documentCount}`);
   console.log(`  Date range: ${dateRange}`);
+  console.log("\n  Story arc milestones:");
+  console.log(
+    "    Day  1–3: Floaters, headaches, BP elevated — each symptom mild alone",
+  );
+  console.log(
+    "    Day    5: Blurry peripheral vision, BP 171/101, foot tingling begins",
+  );
+  console.log(
+    "    Day    7: ⚠️  WARNING #1 — Photopsia + hypertension + T2DM cluster flagged",
+  );
+  console.log(
+    "    Day    8: Daughter drives Maggie to GP after alert. Referral ordered.",
+  );
+  console.log(
+    "    Day    9: HbA1c 8.4% confirmed. Blood test document uploaded.",
+  );
+  console.log("    Day   11: Ophthalmologist referral letter uploaded.");
+  console.log(
+    "    Day   16: 🚨 WARNING #2 — Transient monocular vision loss ('curtain')",
+  );
+  console.log(
+    "    Day   16: → Patient went to ED. CT clear. TIA workup ongoing.",
+  );
+  console.log(
+    "    Day   21: Ophthalmologist appointment today. Tailored report generated.",
+  );
   console.log("========================\n");
 }
 
