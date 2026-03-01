@@ -52,45 +52,50 @@ router.get("/", async (req: Request, res: Response) => {
 
         let adherence = 0;
 
-        // Check if user has active medications
-        const { count: medCount } = await supabase
-            .from("medications")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("active", true);
-
-        if (medCount && medCount > 0) {
-            // Medication-based adherence: taken logs / (active meds * 30 days)
-            const { count: takenCount } = await supabase
-                .from("medication_logs")
+        // Try medication-based adherence first, fall back to check-in count
+        try {
+            const { count: medCount } = await supabase
+                .from("medications")
                 .select("*", { count: "exact", head: true })
                 .eq("user_id", userId)
-                .eq("taken", true)
-                .gte("scheduled_date", thirtyDaysAgoDate);
+                .eq("active", true);
 
-            adherence = Math.min(Math.round(((takenCount || 0) / (medCount * 30)) * 100), 100);
-        } else {
-            // Fallback: check-in count adherence
-            const { count: adherenceCount, error: adherenceError } = await supabase
+            if (medCount && medCount > 0) {
+                const { count: takenCount } = await supabase
+                    .from("medication_logs")
+                    .select("*", { count: "exact", head: true })
+                    .eq("user_id", userId)
+                    .eq("taken", true)
+                    .gte("scheduled_date", thirtyDaysAgoDate);
+
+                adherence = Math.min(Math.round(((takenCount || 0) / (medCount * 30)) * 100), 100);
+            } else {
+                throw new Error("no medications, use checkin fallback");
+            }
+        } catch {
+            // Fallback: check-in count adherence (also handles missing medications table)
+            const { count: adherenceCount } = await supabase
                 .from("check_ins")
                 .select("*", { count: 'exact', head: true })
                 .eq("user_id", userId)
                 .gte("created_at", thirtyDaysAgo.toISOString());
 
-            if (adherenceError) throw adherenceError;
             adherence = Math.min(Math.round(((adherenceCount || 0) / 30) * 100), 100);
         }
 
-        // 3. Streak from profile
-        const { data: profileData, error: profileErr } = await supabase
-            .from("profiles")
-            .select("streak")
-            .eq("id", userId)
-            .single();
+        // 3. Streak from profile (column may not exist yet)
+        let streak = 0;
+        try {
+            const { data: profileData } = await supabase
+                .from("profiles")
+                .select("streak")
+                .eq("id", userId)
+                .single();
 
-        if (profileErr) throw profileErr;
-
-        const streak = profileData?.streak || 0;
+            streak = profileData?.streak || 0;
+        } catch {
+            // streak column may not exist — default to 0
+        }
 
         // 4. Latest entry
         const latestRaw = checkins.length > 0 ? checkins[0] : null;

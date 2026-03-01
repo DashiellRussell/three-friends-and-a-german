@@ -55,9 +55,14 @@ export function SymptomGraph() {
 
   useEffect(() => {
     apiFetch("/api/checkin/graph")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Graph fetch failed (${r.status})`);
+        return r.json();
+      })
       .then((d) => {
-        setData(d);
+        if (d && Array.isArray(d.nodes) && Array.isArray(d.links)) {
+          setData(d);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));

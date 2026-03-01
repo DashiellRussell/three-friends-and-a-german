@@ -33,7 +33,10 @@ export function Dashboard({
   useEffect(() => {
     if (!user) return;
     apiFetch("/api/symptoms/alerts")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Alerts fetch failed (${res.status})`);
+        return res.json();
+      })
       .then((body) => setAlerts(body.alerts || []))
       .catch(console.error);
   }, [user]);
@@ -42,7 +45,10 @@ export function Dashboard({
   useEffect(() => {
     if (!user?.id) return;
     apiFetch("/api/dashboard")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Dashboard fetch failed (${r.status})`);
+        return r.json();
+      })
       .then((d) => {
         setData(d);
         setIsLoading(false);
@@ -66,7 +72,10 @@ export function Dashboard({
       method: "POST",
     })
       .then(() => apiFetch("/api/symptoms/alerts"))
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Alerts fetch failed (${res.status})`);
+        return res.json();
+      })
       .then((body) => setAlerts(body.alerts || []))
       .catch(console.error);
   }

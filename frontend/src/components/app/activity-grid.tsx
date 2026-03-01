@@ -13,7 +13,10 @@ export function ActivityGrid({ userId }: { userId: string }) {
     if (!userId) return;
 
     apiFetch("/api/checkin")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Checkin fetch failed (${res.status})`);
+        return res.json();
+      })
       .then((data) => {
         const checkIns = Array.isArray(data) ? data : data.check_ins || [];
 
