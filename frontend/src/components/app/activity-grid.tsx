@@ -46,7 +46,7 @@ export function ActivityGrid({ userId }: { userId: string }) {
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - (WEEKS - 1) * 7 - todayDay);
 
-    const weeksData = [];
+    const weeksData: ({ date: string, count: number } | null)[][] = [];
     let currentDate = new Date(startDate);
 
     for (let w = 0; w < WEEKS; w++) {
@@ -89,24 +89,66 @@ export function ActivityGrid({ userId }: { userId: string }) {
                 </div>
             </div>
 
-            <div className="flex justify-center">
-                <div className="flex gap-1 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {weeksData.map((week, wIndex) => (
-                        <div key={wIndex} className="flex flex-col gap-1">
-                            {week.map((day, dIndex) => {
-                                if (day === null) {
-                                    return <div key={dIndex} className="h-[10px] w-[10px] rounded-[2px]" />; // empty placeholder
+            <div className="flex w-full">
+                <div className="flex flex-col gap-1 pr-2 pt-[14px]">
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]" />
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]">Mon</div>
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]" />
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]">Wed</div>
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]" />
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]">Fri</div>
+                    <div className="h-[10px] text-[9px] text-zinc-400 leading-[10px]" />
+                </div>
+                <div className="flex-1 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <div className="flex flex-col min-w-max">
+                        <div className="mb-1 flex gap-1 h-[10px] text-[9px] text-zinc-400 relative">
+                            {weeksData.map((week, wIndex) => {
+                                const validDay = week.find(d => d !== null);
+                                if (!validDay) return <div key={wIndex} className="w-[10px] shrink-0" />;
+
+                                const parts = validDay.date.split("-");
+                                const monthNum = parseInt(parts[1], 10);
+                                const monthStr = new Date(2000, monthNum - 1, 1).toLocaleDateString("en-US", { month: "short" });
+
+                                let showMonth = false;
+                                if (wIndex === 0) {
+                                    showMonth = true;
+                                } else {
+                                    const prevValidDay = weeksData[wIndex - 1].find(d => d !== null);
+                                    if (prevValidDay) {
+                                        const prevParts = prevValidDay.date.split("-");
+                                        const prevMonthNum = parseInt(prevParts[1], 10);
+                                        const prevMonthStr = new Date(2000, prevMonthNum - 1, 1).toLocaleDateString("en-US", { month: "short" });
+                                        if (monthStr !== prevMonthStr) showMonth = true;
+                                    }
                                 }
+
                                 return (
-                                    <div
-                                        key={dIndex}
-                                        className={`h-[10px] w-[10px] rounded-[2px] ${getColor(day.count)} transition-colors`}
-                                        title={`${day.date}: ${day.count} logs`}
-                                    />
+                                    <div key={wIndex} className="relative w-[10px] shrink-0">
+                                        {showMonth && <span className="absolute left-0 bottom-0 whitespace-nowrap">{monthStr}</span>}
+                                    </div>
                                 );
                             })}
                         </div>
-                    ))}
+                        <div className="flex gap-1">
+                            {weeksData.map((week, wIndex) => (
+                                <div key={wIndex} className="flex flex-col gap-1">
+                                    {week.map((day, dIndex) => {
+                                        if (day === null) {
+                                            return <div key={dIndex} className="h-[10px] w-[10px] rounded-[2px]" />; // empty placeholder
+                                        }
+                                        return (
+                                            <div
+                                                key={dIndex}
+                                                className={`h-[10px] w-[10px] rounded-[2px] ${getColor(day.count)} transition-colors`}
+                                                title={`${day.date}: ${day.count} logs`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

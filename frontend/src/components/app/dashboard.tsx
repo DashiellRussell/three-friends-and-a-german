@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CHECKINS } from "@/lib/mock-data";
+
 import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
 import { ActivityGrid } from "./activity-grid";
@@ -49,18 +49,14 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
       });
   }, [user?.id]);
 
-  const last7 = data?.last7?.length ? data.last7 : CHECKINS.slice(0, 7).reverse();
-  const streak = data?.streak ?? 4;
-  const energy = data?.energy_avg ?? 6.5;
-  const adherence = data?.adherence ?? 87;
+  const last7 = data?.last7 || [];
+  const streak = data?.streak ?? 0;
+  const energy = data?.energy_avg ?? 0;
+  const adherence = data?.adherence ?? 0;
 
 
 
-  const latest = data?.latest_entry || {
-    summary: "Error loading latest entry",
-    timeLabel: "Error loading latest entry",
-    symptom_count: 2
-  };
+  const latest = data?.latest_entry;
 
   return (
     <div className="px-5 pt-8 pb-25">
@@ -131,7 +127,7 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
       <div className="mb-4 rounded-2xl border border-zinc-100 bg-white p-5 transition-all hover:border-zinc-200 hover:shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-[13px] font-semibold text-zinc-900">
-            Energy
+            Energy (Past Week)
           </span>
           <button
             onClick={() => goTo("trends")}
@@ -143,36 +139,60 @@ export function Dashboard({ goTo, onStartVoice }: { goTo: (tab: string) => void;
         {isLoading ? (
           <div className="h-[60px] w-full animate-pulse rounded-xl bg-zinc-200/60" />
         ) : (
-          <Sparkline
-            data={last7.map((c: any) => c.energy)}
-            labels={last7.map((c: any) => c.date.includes(" ") ? c.date.split(" ").pop() : c.date)}
-            color="#18181b"
-            fill
-            highlight={last7.length - 1}
-          />
+          <div className="relative pl-4">
+            <div className="absolute left-0 top-0 bottom-5 flex flex-col justify-between text-[9px] text-zinc-300">
+              <span>10</span>
+              <span>1</span>
+            </div>
+            <Sparkline
+              data={last7.map((c: any) => c.energy)}
+              labels={last7.map((c: any) => c.date.includes(" ") ? c.date.split(" ").pop() : c.date)}
+              color="#18181b"
+              fill
+              highlight={last7.length - 1}
+            />
+          </div>
         )}
       </div>
 
       {/* Latest entry */}
-      <button
-        onClick={() => goTo("log")}
-        className="w-full rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
-      >
-        <div className="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-          Latest
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[14px] font-medium text-zinc-900 capitalize">
+      {latest && (
+        <button
+          onClick={() => goTo("log")}
+          className="w-full rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm"
+        >
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
+              Latest
+            </div>
+            {latest.symptom_count > 0 && <Pill>{latest.symptom_count} symptoms</Pill>}
+          </div>
+
+          <div className="relative mb-2">
+            <div className="line-clamp-2 text-[14px] font-medium leading-relaxed text-zinc-900">
               {latest.summary}
             </div>
-            <div className="mt-1 text-[12px] text-zinc-400">
+
+            {/* Show fade + see more if text is reasonably long (rough proxy for > 2 lines) */}
+            {latest.summary.length > 80 && (
+              <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+            {latest.summary.length > 80 ? (
+              <div className="text-[11px] font-medium text-zinc-500">
+                See more →
+              </div>
+            ) : (
+              <div />
+            )}
+            <div className="text-[12px] text-zinc-400">
               {latest.timeLabel} {latest.mood ? `· Mood: ${latest.mood}` : ''}
             </div>
           </div>
-          {latest.symptom_count > 0 && <Pill>{latest.symptom_count} symptoms</Pill>}
-        </div>
-      </button>
+        </button>
+      )}
 
       {/* Activity Grid */}
       <ActivityGrid userId={user?.id || ""} />
