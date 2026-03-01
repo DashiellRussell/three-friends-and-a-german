@@ -514,6 +514,8 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
             style={{
               width: 160,
               height: 160,
+              borderRadius: "50%",
+              overflow: "hidden",
               position: "relative",
               animation: `morphSphere ${conversation.isSpeaking ? "2s" : "5s"} ease-in-out infinite, sphereFloat 4s ease-in-out infinite, ${sphereTheme.glow} ${sphereTheme.speed} ease-in-out infinite`,
               transition: "box-shadow 0.8s ease",
