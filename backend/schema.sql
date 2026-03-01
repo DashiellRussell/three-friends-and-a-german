@@ -147,6 +147,29 @@ create policy "Users read own chunks" on document_chunks
 create index chunks_document on document_chunks (document_id, chunk_index);
 
 -- ============================================================
+-- 5b. checkin_chunks  (RAG pipeline for health events)
+-- ============================================================
+create table checkin_chunks (
+  id           uuid primary key default gen_random_uuid(),
+  check_in_id  uuid not null references check_ins(id) on delete cascade,
+  user_id      uuid not null references profiles(id) on delete cascade,
+  chunk_index  int4 not null,
+  content      text not null,
+  embedding    vector(1024),
+  metadata     jsonb,
+  created_at   timestamptz default now()
+);
+
+alter table checkin_chunks enable row level security;
+create policy "Users read own checkin chunks" on checkin_chunks
+  for select using (user_id = auth.uid());
+create policy "Users insert own checkin chunks" on checkin_chunks
+  for insert with check (user_id = auth.uid());
+
+create index checkin_chunks_user on checkin_chunks (user_id, created_at desc);
+create index checkin_chunks_checkin on checkin_chunks (check_in_id, chunk_index);
+
+-- ============================================================
 -- 6. reports
 -- ============================================================
 create table reports (
