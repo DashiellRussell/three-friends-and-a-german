@@ -9,7 +9,6 @@ import { SymptomGraph } from "../symptom-graph";
 import { DashboardHeader } from "./DashboardHeader";
 import { AlertsPanel } from "./AlertsPanel";
 import { StatCards } from "./StatCards";
-import { EnergySparkline } from "./EnergySparkline";
 import { LatestEntry } from "./LatestEntry";
 import { CriticalAlert, DashboardData } from "./types";
 
@@ -117,15 +116,9 @@ export function Dashboard({
 
       <ActivityGrid userId={user?.id || ""} />
 
-      <SymptomGraph />
-
       {latest && <LatestEntry latest={latest} onClick={() => goTo("log")} />}
 
-      <EnergySparkline
-        last7={last7}
-        isLoading={isLoading}
-        onSeeAll={() => goTo("trends")}
-      />
+      <SymptomGraph />
     </div>
   );
 }

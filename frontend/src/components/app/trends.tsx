@@ -10,11 +10,11 @@ export function Trends() {
   const [range, setRange] = useState("week");
   const [trendsData, setTrendsData] = useState<
     | {
-        date: string;
-        energy: number | null;
-        sleep: number | null;
-        symptoms?: string[];
-      }[]
+      date: string;
+      energy: number | null;
+      sleep: number | null;
+      symptoms?: string[];
+    }[]
     | null
   >(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,14 +42,14 @@ export function Trends() {
   const sleepD = trendsData ? trendsData.map((c) => c.sleep) : [];
   const trendLabels = trendsData
     ? trendsData.map((c, i) => {
-        // c.date is like "Feb 23" or similar from the backend "month day" format
-        const step = range === "month" ? 5 : range === "2weeks" ? 2 : 1;
+      // c.date is like "Feb 23" or similar from the backend "month day" format
+      const step = range === "month" ? 5 : range === "2weeks" ? 2 : 1;
 
-        // Space labels backwards from the most recent day to ensure today is always labeled
-        if ((trendsData.length - 1 - i) % step !== 0) return "";
+      // Space labels backwards from the most recent day to ensure today is always labeled
+      if ((trendsData.length - 1 - i) % step !== 0) return "";
 
-        return c.date; // Use "Feb 23" instead of just "23"
-      })
+      return c.date; // Use "Feb 23" instead of just "23"
+    })
     : [];
 
   const validEnergy = energyD.filter((e) => e !== null) as number[];
@@ -258,31 +258,7 @@ export function Trends() {
         )}
       </div>
 
-      {/* AI Insight */}
-      <div className="mb-3 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/50 p-5">
-        <div className="mb-2 flex items-center gap-2">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#0284c7"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 16v-4" />
-            <path d="M12 8h.01" />
-          </svg>
-          <span className="text-xs font-semibold text-sky-700">AI Insight</span>
-        </div>
-        <p className="text-[13px] leading-relaxed text-slate-600">
-          Your energy dips correlate with nights under 6 hours sleep. Feb 27
-          shows the lowest energy (5/10) following 5 hours sleep, combined with
-          missed Vitamin D and new symptoms (thirst, fatigue) that may relate to
-          your elevated HbA1c.
-        </p>
-      </div>
+
 
       {/* Symptom Network Graph */}
       <SymptomGraph />
