@@ -12,18 +12,20 @@ declare global {
 
 /**
  * Auth middleware — extracts user from Supabase JWT.
- * For dev/testing, also accepts x-user-id header as fallback.
+ * For dev/testing (NODE_ENV !== 'production'), also accepts x-user-id header as fallback.
  */
 export async function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // Dev shortcut: x-user-id or uuid header
-  const devUserId = (req.headers["x-user-id"] || req.headers["uuid"]) as string | undefined;
-  if (devUserId) {
-    req.userId = devUserId;
-    return next();
+  // Dev shortcut: x-user-id or uuid header (only in non-production)
+  if (process.env.NODE_ENV !== "production") {
+    const devUserId = (req.headers["x-user-id"] || req.headers["uuid"]) as string | undefined;
+    if (devUserId) {
+      req.userId = devUserId;
+      return next();
+    }
   }
 
   // Production: Bearer token from Supabase auth
@@ -44,6 +46,13 @@ export async function requireAuth(
     return;
   }
 
-  req.userId = user.id;
+  // Look up the profile's id using auth_id
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("auth_id", user.id)
+    .single();
+
+  req.userId = profile?.id || user.id;
   next();
 }

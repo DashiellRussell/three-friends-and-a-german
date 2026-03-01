@@ -30,6 +30,8 @@ export interface UserProfile {
   checkin_time: string | null;
   voice_pref: string | null;
   language: string;
+  onboarding_completed?: boolean;
+  onboarding_step?: number;
 }
 
 interface UserContextType {
