@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/user-context";
 import { Dashboard } from "@/components/app/Dashboard";
 import { Log } from "@/components/app/log";
@@ -35,69 +36,9 @@ const NAV_ITEMS: { id: Tab | "input"; label: string; d: string }[] = [
   },
 ];
 
-function LoginScreen() {
-  const { login } = useUser();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setError("");
-    setLoading(true);
-    try {
-      await login(email.trim());
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex h-dvh flex-col items-center justify-center bg-[#fafafa] px-8">
-      <div className="mb-10 flex flex-col items-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          </svg>
-        </div>
-        <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">Tessera</h1>
-        <p className="mt-1 text-[14px] text-zinc-400">Your AI health companion</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="w-full max-w-[320px]">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
-          autoFocus
-          className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 text-[15px] text-zinc-900 placeholder:text-zinc-300 outline-none transition-colors focus:border-zinc-400"
-        />
-        {error && (
-          <p className="mt-2 text-[13px] text-red-500">{error}</p>
-        )}
-        <button
-          type="submit"
-          disabled={loading || !email.trim()}
-          className="mt-3 w-full rounded-2xl bg-zinc-900 py-3.5 text-[15px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-40"
-        >
-          {loading ? "Signing in..." : "Continue"}
-        </button>
-      </form>
-
-      <p className="mt-6 text-center text-[12px] text-zinc-300">
-        We&apos;ll create an account if you&apos;re new
-      </p>
-    </div>
-  );
-}
-
-function DemoApp() {
+export default function AppPage() {
   const { user, loading } = useUser();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [targetCheckinId, setTargetCheckinId] = useState<string | null>(null);
   const [logSubTab, setLogSubTab] = useState<"log" | "files" | "reports" | undefined>(undefined);
@@ -106,6 +47,20 @@ function DemoApp() {
   const [callMode, setCallMode] = useState(false);
   const [chatMode, setChatMode] = useState(false);
   const [uploadMode, setUploadMode] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (user && user.onboarding_completed === false) {
+      router.push("/onboarding");
+    }
+  }, [user, router]);
 
   if (loading) {
     return (
@@ -116,7 +71,7 @@ function DemoApp() {
   }
 
   if (!user) {
-    return <LoginScreen />;
+    return null;
   }
 
   return (
@@ -231,8 +186,4 @@ function DemoApp() {
       )}
     </div>
   );
-}
-
-export default function DemoPage() {
-  return <DemoApp />;
 }
