@@ -638,7 +638,7 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [checkInsResult, symptomsResult] = await Promise.all([
+    const [checkInsResult, symptomsResult, outboundMedsResult] = await Promise.all([
       supabase
         .from("check_ins")
         .select("created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason")
@@ -652,7 +652,14 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
         .eq("dismissed", false)
         .order("created_at", { ascending: false })
         .limit(10),
+      supabase
+        .from("medications")
+        .select("name, dosage, frequency")
+        .eq("user_id", userId)
+        .eq("active", true),
     ]);
+
+    const outboundMeds = outboundMedsResult.data || [];
 
     // Build conversational context from check-in history
     let outboundContext = "";
@@ -697,9 +704,15 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
       outboundContext = "No recent check-ins on file. This is a general wellness check-in.";
     }
 
+    // Build medications string for outbound call
+    const outboundMedsStr = outboundMeds.length > 0
+      ? outboundMeds.map((m) => `${m.name}${m.dosage ? ` ${m.dosage}` : ""}${m.frequency ? ` (${m.frequency})` : ""}`).join(", ")
+      : "none listed";
+
     // Merge dynamic variables with conversational context + instructions
     const enrichedVariables = {
       ...(dynamic_variables || {}),
+      medications: outboundMedsStr,
       recent_health_summary: `${outboundContext}\n\n${conversationalInstructions}`,
       conversation_context: `${outboundContext}\n\n${conversationalInstructions}`,
     };
