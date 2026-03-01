@@ -6,6 +6,8 @@ import { useUser } from "@/lib/user-context";
 import { Pill, Sparkline } from "./shared";
 import { ActivityGrid } from "./activity-grid";
 
+import { SymptomGraph } from "./symptom-graph";
+
 interface CriticalAlert {
   id: string;
   name: string;
@@ -29,18 +31,25 @@ function formatDate(): string {
   });
 }
 
-export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) => void }) {
+export function Dashboard({
+  goTo,
+}: {
+  goTo: (tab: string, checkinId?: string) => void;
+}) {
   const { user } = useUser();
   const firstName = user?.display_name?.split(" ")[0] || "there";
   const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
   useEffect(() => {
     if (!user) return;
-    fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user.id } })
-      .then(res => res.json())
-      .then(data => setAlerts(data.alerts || []))
+    fetch(`${backendUrl}/api/symptoms/alerts`, {
+      headers: { "x-user-id": user.id },
+    })
+      .then((res) => res.json())
+      .then((data) => setAlerts(data.alerts || []))
       .catch(console.error);
   }, [user, backendUrl]);
 
@@ -49,7 +58,7 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
       method: "PATCH",
       headers: { "x-user-id": user!.id },
     })
-      .then(() => setAlerts(prev => prev.filter(a => a.id !== id)))
+      .then(() => setAlerts((prev) => prev.filter((a) => a.id !== id)))
       .catch(console.error);
   }
 
@@ -59,9 +68,11 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
       headers: { "x-user-id": user!.id },
     })
       .then(() =>
-        fetch(`${backendUrl}/api/symptoms/alerts`, { headers: { "x-user-id": user!.id } })
-          .then(res => res.json())
-          .then(data => setAlerts(data.alerts || []))
+        fetch(`${backendUrl}/api/symptoms/alerts`, {
+          headers: { "x-user-id": user!.id },
+        })
+          .then((res) => res.json())
+          .then((data) => setAlerts(data.alerts || [])),
       )
       .catch(console.error);
   }
@@ -72,35 +83,36 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
   useEffect(() => {
     if (!user?.id) return;
 
-    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+    const BACKEND_URL =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
     console.log(BACKEND_URL);
     fetch(`${BACKEND_URL}/api/dashboard`, {
       headers: {
-        "x-user-id": user.id
-      }
+        "x-user-id": user.id,
+      },
     })
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         setData(d);
         setIsLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
         setIsLoading(false);
       });
   }, [user?.id]);
 
-  const last7 = data?.last7?.length ? data.last7 : CHECKINS.slice(0, 7).reverse();
+  const last7 = data?.last7?.length
+    ? data.last7
+    : CHECKINS.slice(0, 7).reverse();
   const streak = data?.streak ?? 4;
   const energy = data?.energy_avg ?? 6.5;
   const adherence = data?.adherence ?? 87;
 
-
-
   const latest = data?.latest_entry || {
     summary: "Error loading latest entry",
     timeLabel: "Error loading latest entry",
-    symptom_count: 2
+    symptom_count: 2,
   };
 
   return (
@@ -121,7 +133,16 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
           onClick={() => setPanelOpen(true)}
           className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white transition-all hover:border-zinc-300 hover:shadow-sm"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <circle cx="12" cy="15" r="0.5" fill="currentColor" stroke="none" />
@@ -137,12 +158,22 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
       {/* Critical alerts panel */}
       {panelOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanelOpen(false)} />
-          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-107.5 rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-xl" style={{ animation: "slideUp 0.25s" }}>
+          <div
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={() => setPanelOpen(false)}
+          />
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-107.5 rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-xl"
+            style={{ animation: "slideUp 0.25s" }}
+          >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-[16px] font-semibold text-zinc-900">Critical Alerts</h3>
-                <p className="text-[12px] text-zinc-400">{alerts.length} active</p>
+                <h3 className="text-[16px] font-semibold text-zinc-900">
+                  Critical Alerts
+                </h3>
+                <p className="text-[12px] text-zinc-400">
+                  {alerts.length} active
+                </p>
               </div>
               <button
                 onClick={() => setPanelOpen(false)}
@@ -152,11 +183,16 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
               </button>
             </div>
             {alerts.length === 0 ? (
-              <div className="py-8 text-center text-sm text-zinc-400">No critical alerts</div>
+              <div className="py-8 text-center text-sm text-zinc-400">
+                No critical alerts
+              </div>
             ) : (
               <div className="flex max-h-72 flex-col gap-2.5 overflow-y-auto">
-                {alerts.map(alert => (
-                  <div key={alert.id} className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-3.5">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-3.5"
+                  >
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
                     <button
                       className="min-w-0 flex-1 text-left"
@@ -168,10 +204,20 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
                       }}
                       disabled={!alert.check_in_id}
                     >
-                      <div className="text-[13px] font-medium text-zinc-900">{alert.name}</div>
+                      <div className="text-[13px] font-medium text-zinc-900">
+                        {alert.name}
+                      </div>
                       <div className="mt-0.5 text-[11px] text-zinc-400">
-                        Severity {alert.severity}/10 · {new Date(alert.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        {alert.check_in_id && <span className="ml-1 text-zinc-300">· View check-in →</span>}
+                        Severity {alert.severity}/10 ·{" "}
+                        {new Date(alert.created_at).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric" },
+                        )}
+                        {alert.check_in_id && (
+                          <span className="ml-1 text-zinc-300">
+                            · View check-in →
+                          </span>
+                        )}
                       </div>
                     </button>
                     <button
@@ -198,9 +244,6 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
           </div>
         </>
       )}
-
-
-
 
       {/* Stat cards */}
       <div className="mb-6 grid grid-cols-3 gap-3">
@@ -251,7 +294,9 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
         ) : (
           <Sparkline
             data={last7.map((c: any) => c.energy)}
-            labels={last7.map((c: any) => c.date.includes(" ") ? c.date.split(" ").pop() : c.date)}
+            labels={last7.map((c: any) =>
+              c.date.includes(" ") ? c.date.split(" ").pop() : c.date,
+            )}
             color="#18181b"
             fill
             highlight={last7.length - 1}
@@ -273,15 +318,20 @@ export function Dashboard({ goTo }: { goTo: (tab: string, checkinId?: string) =>
               {latest.summary}
             </div>
             <div className="mt-1 text-[12px] text-zinc-400">
-              {latest.timeLabel} {latest.mood ? `· Mood: ${latest.mood}` : ''}
+              {latest.timeLabel} {latest.mood ? `· Mood: ${latest.mood}` : ""}
             </div>
           </div>
-          {latest.symptom_count > 0 && <Pill>{latest.symptom_count} symptoms</Pill>}
+          {latest.symptom_count > 0 && (
+            <Pill>{latest.symptom_count} symptoms</Pill>
+          )}
         </div>
       </button>
 
       {/* Activity Grid */}
       <ActivityGrid userId={user?.id || ""} />
+
+      {/* Symptom graph */}
+      <SymptomGraph />
     </div>
   );
 }
