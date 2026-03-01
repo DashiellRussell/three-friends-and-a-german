@@ -80,7 +80,9 @@ export const generateReport = async (data: any) => {
 
     // Row 2 of Secondary Info
     doc.text("Conditions:", margin, y + 20);
-    doc.text("Allergies:", margin + 65, y + 20);
+
+    // Row 3 of Secondary Info
+    doc.text("Allergies:", margin, y + 27);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(60, 60, 65); // zinc-700
@@ -88,10 +90,10 @@ export const generateReport = async (data: any) => {
     doc.text(patientGender, margin + 45, y + 13);
     doc.text(patientBloodType, margin + 90, y + 13);
 
-    doc.text(patientConditions, margin + 21, y + 20);
-    doc.text(patientAllergies, margin + 83, y + 20);
+    doc.text(patientConditions, margin + 22, y + 20);
+    doc.text(patientAllergies, margin + 22, y + 27);
 
-    y += 30;
+    y += 37;
 
     // ── Executive Summary ──
     doc.setFontSize(11);

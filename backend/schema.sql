@@ -1,5 +1,5 @@
 -- ============================================================
--- Kira Health Companion — Supabase Schema
+-- Tessera Health Companion — Supabase Schema
 -- 7 tables · pgvector · RLS on all tables
 -- ============================================================
 
@@ -30,6 +30,10 @@ create table profiles (
   onboarding_completed boolean default false,
   onboarding_step      int default 0,  -- 0=welcome, 1=profile, 2=health, 3=preferences, 4=done
   onboarding_data      jsonb,          -- partial form state so user can resume
+
+  -- streaks
+  streak               int8 default 0,
+  streak_updated_on    date,
 
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()

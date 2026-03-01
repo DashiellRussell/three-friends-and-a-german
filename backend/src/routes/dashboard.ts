@@ -14,21 +14,32 @@ router.get("/", async (req: Request, res: Response) => {
             .from("check_ins")
             .select("*, symptoms(id)")
             .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(7);
+            .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+            .order("created_at", { ascending: false });
 
         if (checkinsError) throw checkinsError;
 
         const checkins = checkinsData || [];
 
-        const last7 = [...checkins].reverse().map(c => {
-            const d = new Date(c.created_at);
-            return {
-                id: c.id,
-                energy: c.energy || 0,
-                date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-            };
-        });
+        const groupedLast7: Record<string, any> = {};
+        for (const c of checkins) {
+            const dateStr = new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            if (!groupedLast7[dateStr]) groupedLast7[dateStr] = c;
+        }
+
+        const last7 = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+            const c = groupedLast7[dateStr];
+            last7.push({
+                id: c ? c.id : null,
+                energy: c ? c.energy : null,
+                date: dateStr
+            });
+        }
 
         const energyAvg = checkins.length
             ? checkins.reduce((s, c) => s + (c.energy || 0), 0) / checkins.length
@@ -70,8 +81,16 @@ router.get("/", async (req: Request, res: Response) => {
             adherence = Math.min(Math.round(((adherenceCount || 0) / 30) * 100), 100);
         }
 
-        // 3. Streak (simple approximation: number of checkins in last 7 days)
-        const streak = checkins.length;
+        // 3. Streak from profile
+        const { data: profileData, error: profileErr } = await supabase
+            .from("profiles")
+            .select("streak")
+            .eq("id", userId)
+            .single();
+
+        if (profileErr) throw profileErr;
+
+        const streak = profileData?.streak || 0;
 
         // 4. Latest entry
         const latestRaw = checkins.length > 0 ? checkins[0] : null;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useUser } from "@/lib/user-context";
-import { Dashboard } from "@/components/app/dashboard";
+import { Dashboard } from "@/components/app/Dashboard";
 import { Log } from "@/components/app/log";
 import { Trends } from "@/components/app/trends";
 import { Profile } from "@/components/app/profile";

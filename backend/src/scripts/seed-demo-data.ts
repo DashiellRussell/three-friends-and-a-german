@@ -37,7 +37,7 @@ const TARGET_USER_ID = userIdArg ? userIdArg.split("=")[1] : null;
 
 // ── Patient persona ──
 const AMARA_PROFILE = {
-  email: "amara.demo@kira.health",
+  email: "amara.demo@Tessera.health",
   display_name: "Amara Wanjiku",
   date_of_birth: "1992-03-15",
   gender: "Female",
@@ -333,7 +333,7 @@ async function generateTranscript(plan: DayPlan): Promise<string> {
         role: "system",
         content: `You are generating a realistic voice check-in transcript for a health companion app demo. The speaker is Amara, a 34-year-old woman in rural Kenya. She speaks conversational English with occasional simple phrasing.
 
-Write 2-4 sentences as if Amara is speaking naturally to her AI health companion "Kira" during a morning check-in. Use natural, non-clinical language — the way a real person would describe how they feel. Do NOT use formal medical terminology. Do NOT use a greeting or introduction — just jump straight into how she's feeling.
+Write 2-4 sentences as if Amara is speaking naturally to her AI health companion "Tessera" during a morning check-in. Use natural, non-clinical language — the way a real person would describe how they feel. Do NOT use formal medical terminology. Do NOT use a greeting or introduction — just jump straight into how she's feeling.
 
 Context for today: ${plan.storyContext}`,
       },
@@ -353,7 +353,7 @@ Context for today: ${plan.storyContext}`,
 
 // ── Main ──
 async function main() {
-  console.log("=== Kira Health Companion — Demo Data Seeder ===\n");
+  console.log("=== Tessera Health Companion — Demo Data Seeder ===\n");
 
   let userId: string;
 

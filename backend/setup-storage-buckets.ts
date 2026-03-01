@@ -1,7 +1,7 @@
 /**
  * Supabase Storage Bucket Setup
  *
- * Creates the required private storage buckets for Kira Health:
+ * Creates the required private storage buckets for Tessera Health:
  *   - uploads: user-uploaded medical documents (PDFs, images)
  *   - generated: system-generated reports (PDFs)
  *
@@ -24,7 +24,9 @@ const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error("Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env");
+  console.error(
+    "Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env",
+  );
   process.exit(1);
 }
 
@@ -34,7 +36,12 @@ const BUCKETS = [
   {
     name: "uploads",
     public: false,
-    allowedMimeTypes: ["application/pdf", "image/png", "image/jpeg", "image/heic"],
+    allowedMimeTypes: [
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "image/heic",
+    ],
     fileSizeLimit: 20 * 1024 * 1024, // 20MB
   },
   {
@@ -63,7 +70,9 @@ async function setupBuckets() {
       if (error) {
         console.error(`  FAILED to update "${bucket.name}":`, error.message);
       } else {
-        console.log(`  Updated "${bucket.name}" (private=${!bucket.public}, maxSize=${bucket.fileSizeLimit / 1024 / 1024}MB)`);
+        console.log(
+          `  Updated "${bucket.name}" (private=${!bucket.public}, maxSize=${bucket.fileSizeLimit / 1024 / 1024}MB)`,
+        );
       }
     } else {
       // Create new bucket
@@ -76,7 +85,9 @@ async function setupBuckets() {
       if (error) {
         console.error(`  FAILED to create "${bucket.name}":`, error.message);
       } else {
-        console.log(`  Created "${bucket.name}" (private=${!bucket.public}, maxSize=${bucket.fileSizeLimit / 1024 / 1024}MB)`);
+        console.log(
+          `  Created "${bucket.name}" (private=${!bucket.public}, maxSize=${bucket.fileSizeLimit / 1024 / 1024}MB)`,
+        );
       }
     }
   }
@@ -86,8 +97,12 @@ async function setupBuckets() {
     const { data: oldBucket } = await supabase.storage.getBucket(oldName);
     if (oldBucket) {
       console.log(`\n  WARNING: Old "${oldName}" bucket still exists.`);
-      console.log(`  Migrate any files to the new buckets ("uploads" / "generated") and delete it.`);
-      console.log(`  To delete: Supabase Dashboard > Storage > ${oldName} > Delete bucket`);
+      console.log(
+        `  Migrate any files to the new buckets ("uploads" / "generated") and delete it.`,
+      );
+      console.log(
+        `  To delete: Supabase Dashboard > Storage > ${oldName} > Delete bucket`,
+      );
     }
   }
 

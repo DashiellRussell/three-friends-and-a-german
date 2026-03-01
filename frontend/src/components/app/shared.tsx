@@ -104,8 +104,8 @@ export function SegmentedControl({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all ${value === o.value
-              ? "bg-white text-zinc-900 shadow-sm"
-              : "text-zinc-400 hover:text-zinc-600"
+            ? "bg-white text-zinc-900 shadow-sm"
+            : "text-zinc-400 hover:text-zinc-600"
             }`}
         >
           {o.label}
@@ -198,22 +198,42 @@ export function Sparkline({
   fill = false,
   labels,
   highlight,
+  minStatic,
+  maxStatic,
 }: {
-  data: number[];
+  data: (number | null)[];
   color?: string;
   height?: number;
   fill?: boolean;
   labels?: string[];
   highlight?: number;
+  minStatic?: number;
+  maxStatic?: number;
 }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50" style={{ height: height }}>
+        <span className="text-[11px] font-medium text-zinc-400">No data yet</span>
+      </div>
+    );
+  }
 
   const w = 280;
   const h = height;
   const pad = 4;
 
-  if (data.length === 1) {
-    const px = w / 2;
+  const validPts = data.map((v, i) => ({ v, i })).filter(d => d.v !== null) as { v: number, i: number }[];
+  if (validPts.length === 0) {
+    return (
+      <div className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50" style={{ height: height }}>
+        <span className="text-[11px] font-medium text-zinc-400">No data yet</span>
+      </div>
+    );
+  }
+
+  if (validPts.length === 1) {
+    const { i } = validPts[0];
+    const px = data.length > 1 ? pad + (i / (data.length - 1)) * (w - pad * 2) : w / 2;
     const py = h / 2;
     return (
       <div className="relative">
@@ -221,32 +241,39 @@ export function Sparkline({
           <circle
             cx={px}
             cy={py}
-            r={highlight === 0 ? 4 : 2.5}
-            fill={highlight === 0 ? color : "#fff"}
+            r={highlight === i ? 4 : 2.5}
+            fill={highlight === i ? color : "#fff"}
             stroke={color}
-            strokeWidth={highlight === 0 ? 2 : 1.5}
+            strokeWidth={highlight === i ? 2 : 1.5}
           />
         </svg>
         {labels && labels.length > 0 && (
-          <div className="flex justify-center px-1 pt-1.5">
-            <span className="text-[9px] text-zinc-300">
-              {labels[0]}
-            </span>
+          <div className="flex justify-between px-1 pt-1.5">
+            {labels.map((l, lid) => (
+              <span key={lid} className="text-[9px] text-zinc-300">
+                {l}
+              </span>
+            ))}
           </div>
         )}
       </div>
     );
   }
 
-  const min = Math.min(...data) - 0.5;
-  const max = Math.max(...data) + 0.5;
-  const pts = data.map((v, i) => ({
+  const dataMin = Math.min(...validPts.map(d => d.v));
+  const dataMax = Math.max(...validPts.map(d => d.v));
+
+  const min = minStatic !== undefined ? minStatic : dataMin - 0.5;
+  const max = maxStatic !== undefined ? maxStatic : dataMax + 0.5;
+
+  const pts = validPts.map(({ v, i }) => ({
     x: pad + (i / (data.length - 1)) * (w - pad * 2),
-    y: pad + (1 - (v - min) / (max - min)) * (h - pad * 2),
+    y: pad + (1 - (Math.max(min, Math.min(max, v)) - min) / (max - min)) * (h - pad * 2),
     v,
+    i
   }));
   const line = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
+    .map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x},${p.y}`)
     .join(" ");
   const area = `${line} L${pts[pts.length - 1].x},${h} L${pts[0].x},${h} Z`;
 
@@ -262,15 +289,15 @@ export function Sparkline({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {pts.map((p, i) => (
+        {pts.map((p) => (
           <circle
-            key={i}
+            key={p.i}
             cx={p.x}
             cy={p.y}
-            r={highlight === i ? 4 : 2.5}
-            fill={highlight === i ? color : "#fff"}
+            r={highlight === p.i ? 4 : 2.5}
+            fill={highlight === p.i ? color : "#fff"}
             stroke={color}
-            strokeWidth={highlight === i ? 2 : 1.5}
+            strokeWidth={highlight === p.i ? 2 : 1.5}
           />
         ))}
       </svg>

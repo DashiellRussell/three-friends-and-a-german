@@ -13,6 +13,7 @@ import reports from "./routes/reports";
 import voice from "./routes/voice";
 import dashboard from "./routes/dashboard";
 import medications from "./routes/medications";
+import trends from "./routes/trends";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +31,7 @@ app.use("/api/reports", reports);
 app.use("/api/voice", voice);
 app.use("/api/dashboard", dashboard);
 app.use("/api/medications", medications);
+app.use("/api/trends", trends);
 
 // Health check
 app.get("/ping", (_req, res) => {

@@ -1,9 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const STORAGE_KEY = "kira_user";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const STORAGE_KEY = "tessera_user";
 
 export interface UserProfile {
   id: string;
@@ -15,7 +22,11 @@ export interface UserProfile {
   allergies: string[];
   phone_number: string | null;
   timezone: string;
-  emergency_contact: { name: string; phone: string; relationship: string } | null;
+  emergency_contact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  } | null;
   checkin_time: string | null;
   voice_pref: string | null;
   language: string;
@@ -87,7 +98,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, loading, login, logout, refreshProfile }}>
+    <UserContext.Provider
+      value={{ user, loading, login, logout, refreshProfile }}
+    >
       {children}
     </UserContext.Provider>
   );
