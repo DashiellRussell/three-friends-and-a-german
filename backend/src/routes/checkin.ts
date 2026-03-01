@@ -10,6 +10,7 @@ import {
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { chunkAndStoreCheckin } from "../services/chunking";
+import { searchAllByText } from "../services/crossReference";
 
 const router = Router();
 
@@ -239,5 +240,27 @@ router.post(
     res.json({ message });
   },
 );
+
+// Search all health data (check-ins, documents, chunks) by natural language query
+// GET /api/checkin/search?q=headache+and+fatigue&limit=5&threshold=0.3
+router.get("/search", async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const query = req.query.q as string;
+
+  if (!query || query.trim() === "") {
+    res.status(400).json({ error: "Query parameter 'q' is required" });
+    return;
+  }
+
+  const limit = req.query.limit
+    ? parseInt(req.query.limit as string)
+    : undefined;
+  const threshold = req.query.threshold
+    ? parseFloat(req.query.threshold as string)
+    : undefined;
+
+  const results = await searchAllByText(query, userId, { limit, threshold });
+  res.json(results);
+});
 
 export default router;
