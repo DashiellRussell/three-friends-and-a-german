@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
 import { Toggle, Pill, useToast } from "./shared";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 interface Document {
   id: string;
@@ -24,12 +25,17 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 const DOC_ICONS: Record<string, string> = {
-  "Lab Report": "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-  "Clinical Note": "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
-  Prescription: "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z",
+  "Lab Report":
+    "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  "Clinical Note":
+    "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
+  Prescription:
+    "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z",
 };
 
-function formatEmergencyContact(ec: { name: string; phone: string; relationship: string } | null): string {
+function formatEmergencyContact(
+  ec: { name: string; phone: string; relationship: string } | null,
+): string {
   if (!ec) return "Not set";
   return `${ec.name} — ${ec.phone}`;
 }
@@ -42,7 +48,9 @@ export function Profile() {
   const [docsExpanded, setDocsExpanded] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
-  const [callStatus, setCallStatus] = useState<"idle" | "calling" | "done" | "error">("idle");
+  const [callStatus, setCallStatus] = useState<
+    "idle" | "calling" | "done" | "error"
+  >("idle");
   const [callError, setCallError] = useState<string | null>(null);
   const { show: showToast, ToastEl } = useToast();
 
@@ -53,7 +61,9 @@ export function Profile() {
       headers: { "x-user-id": user.id },
     })
       .then((res) => res.json())
-      .then((data) => setDocuments(Array.isArray(data) ? data : data.documents || []))
+      .then((data) =>
+        setDocuments(Array.isArray(data) ? data : data.documents || []),
+      )
       .catch(console.error)
       .finally(() => setDocsLoading(false));
   }, [user]);
@@ -86,7 +96,11 @@ export function Profile() {
         throw new Error(body.error || `Call failed (${res.status})`);
       }
       setCallStatus("done");
-      showToast("Kira is calling you now", "success", "Pick up your phone to start the check-in");
+      showToast(
+        "Tessera is calling you now",
+        "success",
+        "Pick up your phone to start the check-in",
+      );
       setTimeout(() => setCallStatus("idle"), 5000);
     } catch (err) {
       const msg = (err as Error).message;
@@ -96,22 +110,37 @@ export function Profile() {
     }
   }, [user, showToast]);
 
-  const displayName = user?.display_name || user?.email?.split("@")[0] || "User";
+  const displayName =
+    user?.display_name || user?.email?.split("@")[0] || "User";
   const initial = displayName.charAt(0).toUpperCase();
 
   const healthInfo = [
     { l: "Date of birth", v: user?.date_of_birth || "Not set" },
     { l: "Blood type", v: user?.blood_type || "Not set" },
-    { l: "Conditions", v: user?.conditions?.length ? user.conditions.join(", ") : "None reported" },
-    { l: "Allergies", v: user?.allergies?.length ? user.allergies.join(", ") : "None reported" },
-    { l: "Emergency contact", v: formatEmergencyContact(user?.emergency_contact ?? null) },
+    {
+      l: "Conditions",
+      v: user?.conditions?.length
+        ? user.conditions.join(", ")
+        : "None reported",
+    },
+    {
+      l: "Allergies",
+      v: user?.allergies?.length ? user.allergies.join(", ") : "None reported",
+    },
+    {
+      l: "Emergency contact",
+      v: formatEmergencyContact(user?.emergency_contact ?? null),
+    },
   ];
 
   const preferences = [
     { l: "Check-in time", v: user?.checkin_time || "8:00 AM" },
     { l: "Frequency", v: "Daily" },
     { l: "Voice", v: user?.voice_pref || "Sarah (calm)" },
-    { l: "Language", v: user?.language === "en" ? "English" : (user?.language || "English") },
+    {
+      l: "Language",
+      v: user?.language === "en" ? "English" : user?.language || "English",
+    },
   ];
 
   return (
@@ -127,7 +156,9 @@ export function Profile() {
           {initial}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[16px] font-semibold text-zinc-900">{displayName}</div>
+          <div className="text-[16px] font-semibold text-zinc-900">
+            {displayName}
+          </div>
           <div className="mt-0.5 text-[13px] text-zinc-400">{user?.email}</div>
         </div>
         <button className="shrink-0 rounded-xl border border-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-500 transition-colors hover:border-zinc-200 hover:text-zinc-700">
@@ -177,12 +208,16 @@ export function Profile() {
               </div>
             ) : (
               documents.map((doc, i) => {
-                const typeLabel = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
-                const dateStr = new Date(doc.created_at).toLocaleDateString("en-AU", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
+                const typeLabel =
+                  DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
+                const dateStr = new Date(doc.created_at).toLocaleDateString(
+                  "en-AU",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  },
+                );
                 const hasAnalysis = !!doc.summary;
                 return (
                   <button
@@ -202,7 +237,9 @@ export function Profile() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d={DOC_ICONS[typeLabel] || DOC_ICONS["Lab Report"]} />
+                        <path
+                          d={DOC_ICONS[typeLabel] || DOC_ICONS["Lab Report"]}
+                        />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -242,7 +279,9 @@ export function Profile() {
               }`}
             >
               <span className="text-[13px] text-zinc-500">{item.l}</span>
-              <span className="text-[13px] font-medium text-zinc-900">{item.v}</span>
+              <span className="text-[13px] font-medium text-zinc-900">
+                {item.v}
+              </span>
             </div>
           ))}
         </div>
@@ -262,7 +301,9 @@ export function Profile() {
               }`}
             >
               <span className="text-[13px] text-zinc-500">{item.l}</span>
-              <span className="text-[13px] font-medium text-zinc-900">{item.v}</span>
+              <span className="text-[13px] font-medium text-zinc-900">
+                {item.v}
+              </span>
             </div>
           ))}
         </div>
@@ -279,33 +320,75 @@ export function Profile() {
                 : "bg-zinc-900 hover:bg-zinc-800"
           }`}
         >
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-            callStatus === "done" ? "bg-emerald-100" : callStatus === "error" ? "bg-red-100" : "bg-white/10"
-          }`}>
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+              callStatus === "done"
+                ? "bg-emerald-100"
+                : callStatus === "error"
+                  ? "bg-red-100"
+                  : "bg-white/10"
+            }`}
+          >
             {callStatus === "calling" ? (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             ) : callStatus === "done" ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#16a34a"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={callStatus === "error" ? "#dc2626" : "#fff"} strokeWidth="1.8" strokeLinecap="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={callStatus === "error" ? "#dc2626" : "#fff"}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              >
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             )}
           </div>
           <div className="flex-1">
-            <div className={`text-[15px] font-semibold ${
-              callStatus === "done" ? "text-emerald-700" : callStatus === "error" ? "text-red-700" : "text-white"
-            }`}>
-              {callStatus === "calling" ? "Calling…" : callStatus === "done" ? "Call initiated!" : callStatus === "error" ? "Call failed" : "Call me now"}
+            <div
+              className={`text-[15px] font-semibold ${
+                callStatus === "done"
+                  ? "text-emerald-700"
+                  : callStatus === "error"
+                    ? "text-red-700"
+                    : "text-white"
+              }`}
+            >
+              {callStatus === "calling"
+                ? "Calling…"
+                : callStatus === "done"
+                  ? "Call initiated!"
+                  : callStatus === "error"
+                    ? "Call failed"
+                    : "Call me now"}
             </div>
-            <div className={`mt-0.5 text-xs ${
-              callStatus === "done" ? "text-emerald-600/60" : callStatus === "error" ? "text-red-600/60" : "text-white/50"
-            }`}>
+            <div
+              className={`mt-0.5 text-xs ${
+                callStatus === "done"
+                  ? "text-emerald-600/60"
+                  : callStatus === "error"
+                    ? "text-red-600/60"
+                    : "text-white/50"
+              }`}
+            >
               {callStatus === "done"
-                ? "Kira is calling your phone"
+                ? "Tessera is calling your phone"
                 : callStatus === "error"
                   ? callError
-                  : "Kira calls your phone for a hands-free check-in"}
+                  : "Tessera calls your phone for a hands-free check-in"}
             </div>
           </div>
         </button>
@@ -317,7 +400,11 @@ export function Profile() {
           Notifications
         </div>
         <div className="rounded-2xl border border-zinc-100 bg-white px-4">
-          <Toggle on={n1} onToggle={() => setN1(!n1)} label="Check-in reminders" />
+          <Toggle
+            on={n1}
+            onToggle={() => setN1(!n1)}
+            label="Check-in reminders"
+          />
           <div className="h-px bg-zinc-50" />
           <Toggle on={n2} onToggle={() => setN2(!n2)} label="Health alerts" />
           <div className="h-px bg-zinc-50" />
@@ -332,20 +419,50 @@ export function Profile() {
         </div>
         <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white">
           <button className="flex w-full items-center justify-between border-b border-zinc-50 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50">
-            <span className="text-[13px] font-medium text-zinc-900">Export all data</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round">
+            <span className="text-[13px] font-medium text-zinc-900">
+              Export all data
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#d4d4d8"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
           <button className="flex w-full items-center justify-between border-b border-zinc-50 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50">
-            <span className="text-[13px] font-medium text-zinc-900">Privacy & permissions</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round">
+            <span className="text-[13px] font-medium text-zinc-900">
+              Privacy & permissions
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#d4d4d8"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
           <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-zinc-50">
-            <span className="text-[13px] font-medium text-zinc-900">Help & support</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round">
+            <span className="text-[13px] font-medium text-zinc-900">
+              Help & support
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#d4d4d8"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -358,8 +475,18 @@ export function Profile() {
           onClick={logout}
           className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-zinc-50"
         >
-          <span className="text-[13px] font-medium text-zinc-900">Sign out</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round">
+          <span className="text-[13px] font-medium text-zinc-900">
+            Sign out
+          </span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#d4d4d8"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -368,8 +495,18 @@ export function Profile() {
       {/* Danger zone */}
       <div className="overflow-hidden rounded-2xl border border-red-100 bg-white">
         <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-red-50/50">
-          <span className="text-[13px] font-medium text-red-500">Delete all data</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round">
+          <span className="text-[13px] font-medium text-red-500">
+            Delete all data
+          </span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fca5a5"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -377,7 +514,7 @@ export function Profile() {
 
       {/* Version */}
       <div className="mt-6 text-center text-[11px] text-zinc-300">
-        Kira Health v0.1.0
+        Tessera Health v0.1.0
       </div>
     </div>
   );

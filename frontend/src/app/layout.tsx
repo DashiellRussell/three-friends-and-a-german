@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Kira — AI Health Companion",
+  title: "Tessera — AI Health Companion",
   description:
     "Voice-first daily health check-ins, medical document analysis, and proactive care.",
 };

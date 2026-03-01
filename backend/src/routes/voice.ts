@@ -16,7 +16,10 @@ function buildTranscriptText(transcript: unknown): string | null {
   if (typeof transcript === "string") return transcript;
   if (Array.isArray(transcript)) {
     return (transcript as Array<{ role: string; message: string }>)
-      .map((turn) => `${turn.role === "agent" ? "Agent" : "User"}: ${turn.message}`)
+      .map(
+        (turn) =>
+          `${turn.role === "agent" ? "Agent" : "User"}: ${turn.message}`,
+      )
       .join("\n");
   }
   return null;
@@ -25,7 +28,12 @@ function buildTranscriptText(transcript: unknown): string | null {
 // ── Helper: extract duration from ElevenLabs response (multiple possible field names) ──
 function extractDuration(details: Record<string, unknown>): number | null {
   // Try known field names
-  for (const key of ["call_duration_secs", "duration", "call_duration", "duration_seconds"]) {
+  for (const key of [
+    "call_duration_secs",
+    "duration",
+    "call_duration",
+    "duration_seconds",
+  ]) {
     if (typeof details[key] === "number" && details[key] > 0) {
       return details[key] as number;
     }
@@ -61,14 +69,16 @@ interface ParsedCheckin {
   }>;
 }
 
-async function parseTranscriptWithMistral(transcript: string): Promise<ParsedCheckin> {
+async function parseTranscriptWithMistral(
+  transcript: string,
+): Promise<ParsedCheckin> {
   const response = await mistral.chat.complete({
     model: "mistral-large-latest",
     responseFormat: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content: `You are a medical data extraction assistant. Extract structured health data from a voice check-in transcript between a patient and Kira (an AI health companion).
+        content: `You are a medical data extraction assistant. Extract structured health data from a voice check-in transcript between a patient and Tessera (an AI health companion).
 
 Return a JSON object with these fields:
 {
@@ -107,10 +117,14 @@ Rules:
   const content = response.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
     return {
-      mood: "neutral", energy: 5, sleep_hours: 7,
+      mood: "neutral",
+      energy: 5,
+      sleep_hours: 7,
       summary: "Check-in recorded",
       notes: transcript.slice(0, 500),
-      flagged: false, flag_reason: null, symptoms: [],
+      flagged: false,
+      flag_reason: null,
+      symptoms: [],
     };
   }
 
@@ -128,10 +142,14 @@ Rules:
     return parsed;
   } catch {
     return {
-      mood: "neutral", energy: 5, sleep_hours: 7,
+      mood: "neutral",
+      energy: 5,
+      sleep_hours: 7,
       summary: "Check-in recorded (parse error)",
       notes: transcript.slice(0, 500),
-      flagged: false, flag_reason: null, symptoms: [],
+      flagged: false,
+      flag_reason: null,
+      symptoms: [],
     };
   }
 }
@@ -145,7 +163,9 @@ async function syncCallFromElevenLabs(
   const details = await getConversationDetails(conversationId);
 
   const transcriptText = buildTranscriptText(details.transcript);
-  const duration = extractDuration(details as unknown as Record<string, unknown>);
+  const duration = extractDuration(
+    details as unknown as Record<string, unknown>,
+  );
 
   const updates: Record<string, unknown> = {
     status: details.status === "done" ? "completed" : details.status,
@@ -158,7 +178,9 @@ async function syncCallFromElevenLabs(
 
   // Parse transcript through Mistral and create a proper check-in + symptoms
   if (transcriptText && updates.status === "completed") {
-    console.log(`[sync] Parsing transcript for call ${callId} through Mistral...`);
+    console.log(
+      `[sync] Parsing transcript for call ${callId} through Mistral...`,
+    );
     const parsed = await parseTranscriptWithMistral(transcriptText);
 
     const { data: checkin } = await supabase
@@ -191,17 +213,25 @@ async function syncCallFromElevenLabs(
         alert_message: s.alert_message,
       }));
       await supabase.from("symptoms").insert(symptomRows);
-      console.log(`[sync] Created ${symptomRows.length} symptom records for call ${callId}`);
+      console.log(
+        `[sync] Created ${symptomRows.length} symptom records for call ${callId}`,
+      );
     }
 
-    console.log(`[sync] Check-in created: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
+    console.log(
+      `[sync] Check-in created: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`,
+    );
   }
 
   return { updated: true, status: updates.status as string };
 }
 
 // ── Background poller: wait for call to finish, then sync ──
-function pollCallCompletion(callId: string, conversationId: string, userId: string) {
+function pollCallCompletion(
+  callId: string,
+  conversationId: string,
+  userId: string,
+) {
   const POLL_INTERVAL_MS = 15_000; // check every 15 seconds
   const MAX_POLL_MS = 15 * 60_000; // give up after 15 minutes
   const startTime = Date.now();
@@ -218,17 +248,24 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
 
       // Still in progress — keep polling
       if (details.status !== "done" && details.status !== "failed") {
-        console.log(`[poll] Call ${callId} status: ${details.status}, waiting...`);
+        console.log(
+          `[poll] Call ${callId} status: ${details.status}, waiting...`,
+        );
         return;
       }
 
       // Call finished — sync and stop polling
-      console.log(`[poll] Call ${callId} finished (${details.status}), syncing...`);
+      console.log(
+        `[poll] Call ${callId} finished (${details.status}), syncing...`,
+      );
       clearInterval(timer);
       await syncCallFromElevenLabs(callId, conversationId, userId);
       console.log(`[poll] Call ${callId} synced successfully`);
     } catch (err) {
-      console.error(`[poll] Error polling call ${callId}:`, (err as Error).message);
+      console.error(
+        `[poll] Error polling call ${callId}:`,
+        (err as Error).message,
+      );
     }
   }, POLL_INTERVAL_MS);
 }
@@ -263,10 +300,7 @@ router.post("/webhook/call-complete", async (req: Request, res: Response) => {
     if (transcript) updates.transcript = transcript;
     if (duration_seconds) updates.duration_seconds = duration_seconds;
 
-    await supabase
-      .from("outbound_calls")
-      .update(updates)
-      .eq("id", call.id);
+    await supabase.from("outbound_calls").update(updates).eq("id", call.id);
 
     // Auto-create a check-in from the call transcript
     if (transcript) {
@@ -297,19 +331,38 @@ router.post("/backfill", async (req: Request, res: Response) => {
       .in("status", ["initiated", "in_progress"]);
 
     if (incompleteCalls && incompleteCalls.length > 0) {
-      console.log(`[backfill] Phase 1: ${incompleteCalls.length} incomplete calls to fetch from ElevenLabs`);
+      console.log(
+        `[backfill] Phase 1: ${incompleteCalls.length} incomplete calls to fetch from ElevenLabs`,
+      );
       for (const call of incompleteCalls) {
         if (!call.elevenlabs_conversation_id) {
-          results.push({ id: call.id, phase: 1, error: "No conversation ID", updated: false });
+          results.push({
+            id: call.id,
+            phase: 1,
+            error: "No conversation ID",
+            updated: false,
+          });
           continue;
         }
         try {
           console.log(`[backfill] Syncing call ${call.id}...`);
-          const result = await syncCallFromElevenLabs(call.id, call.elevenlabs_conversation_id, call.user_id);
+          const result = await syncCallFromElevenLabs(
+            call.id,
+            call.elevenlabs_conversation_id,
+            call.user_id,
+          );
           results.push({ id: call.id, phase: 1, ...result });
         } catch (err) {
-          console.error(`[backfill] Failed call ${call.id}:`, (err as Error).message);
-          results.push({ id: call.id, phase: 1, error: (err as Error).message, updated: false });
+          console.error(
+            `[backfill] Failed call ${call.id}:`,
+            (err as Error).message,
+          );
+          results.push({
+            id: call.id,
+            phase: 1,
+            error: (err as Error).message,
+            updated: false,
+          });
         }
       }
     }
@@ -338,7 +391,9 @@ router.post("/backfill", async (req: Request, res: Response) => {
       }
 
       if (unparsed.length > 0) {
-        console.log(`[backfill] Phase 2: ${unparsed.length} completed calls need Mistral parsing`);
+        console.log(
+          `[backfill] Phase 2: ${unparsed.length} completed calls need Mistral parsing`,
+        );
         for (const call of unparsed) {
           try {
             console.log(`[backfill] Parsing transcript for call ${call.id}...`);
@@ -373,14 +428,31 @@ router.post("/backfill", async (req: Request, res: Response) => {
                 alert_message: s.alert_message,
               }));
               await supabase.from("symptoms").insert(symptomRows);
-              console.log(`[backfill] Created ${symptomRows.length} symptoms for call ${call.id}`);
+              console.log(
+                `[backfill] Created ${symptomRows.length} symptoms for call ${call.id}`,
+              );
             }
 
-            console.log(`[backfill] Parsed: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
-            results.push({ id: call.id, phase: 2, updated: true, status: "parsed" });
+            console.log(
+              `[backfill] Parsed: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`,
+            );
+            results.push({
+              id: call.id,
+              phase: 2,
+              updated: true,
+              status: "parsed",
+            });
           } catch (err) {
-            console.error(`[backfill] Parse failed for ${call.id}:`, (err as Error).message);
-            results.push({ id: call.id, phase: 2, error: (err as Error).message, updated: false });
+            console.error(
+              `[backfill] Parse failed for ${call.id}:`,
+              (err as Error).message,
+            );
+            results.push({
+              id: call.id,
+              phase: 2,
+              error: (err as Error).message,
+              updated: false,
+            });
           }
         }
       }
@@ -424,7 +496,11 @@ router.post("/sync-calls", async (req: Request, res: Response) => {
 
     for (const call of calls) {
       if (!call.elevenlabs_conversation_id) {
-        results.push({ id: call.id, error: "No conversation ID", updated: false });
+        results.push({
+          id: call.id,
+          error: "No conversation ID",
+          updated: false,
+        });
         continue;
       }
       try {
@@ -443,7 +519,10 @@ router.post("/sync-calls", async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ synced: results.filter((r) => r.updated).length, calls: results });
+    res.json({
+      synced: results.filter((r) => r.updated).length,
+      calls: results,
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -502,7 +581,9 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
     // Fetch recent symptoms (not dismissed)
     const { data: symptoms } = await supabase
       .from("symptoms")
-      .select("name, severity, body_area, is_critical, alert_level, alert_message, created_at")
+      .select(
+        "name, severity, body_area, is_critical, alert_level, alert_message, created_at",
+      )
       .eq("user_id", userId)
       .eq("dismissed", false)
       .order("created_at", { ascending: false })
@@ -513,7 +594,8 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
 
     if (symptoms && symptoms.length > 0) {
       const symptomLines = symptoms.map(
-        (s) => `- ${s.name} (severity: ${s.severity}/10, ${s.body_area || "general"}, ${s.is_critical ? "CRITICAL" : s.alert_level || "info"}, reported: ${new Date(s.created_at).toLocaleDateString()})`,
+        (s) =>
+          `- ${s.name} (severity: ${s.severity}/10, ${s.body_area || "general"}, ${s.is_critical ? "CRITICAL" : s.alert_level || "info"}, reported: ${new Date(s.created_at).toLocaleDateString()})`,
       );
       recentHealthSummary += `Active symptoms:\n${symptomLines.join("\n")}\n\n`;
     }
@@ -531,7 +613,8 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
     }
 
     if (!recentHealthSummary) {
-      recentHealthSummary = "No recent check-ins or symptoms on file. This is a general wellness check-in.";
+      recentHealthSummary =
+        "No recent check-ins or symptoms on file. This is a general wellness check-in.";
     }
 
     // Merge dynamic variables with health context

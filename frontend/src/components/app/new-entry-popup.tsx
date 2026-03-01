@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 
-export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCallMe?: () => void }) {
+export function NewEntryPopup({
+  onClose,
+  onCallMe,
+}: {
+  onClose: () => void;
+  onCallMe?: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-100 flex flex-col justify-end">
       <div onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-sm" />
@@ -52,7 +58,10 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
 
           {/* Call me */}
           <button
-            onClick={() => { onClose(); onCallMe?.(); }}
+            onClick={() => {
+              onClose();
+              onCallMe?.();
+            }}
             className="flex w-full items-center gap-4 rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm active:scale-[0.99]"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
@@ -73,7 +82,7 @@ export function NewEntryPopup({ onClose, onCallMe }: { onClose: () => void; onCa
                 Call me
               </div>
               <div className="mt-0.5 text-xs text-zinc-400">
-                Kira calls your phone
+                Tessera calls your phone
               </div>
             </div>
           </button>

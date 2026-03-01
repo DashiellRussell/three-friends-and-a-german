@@ -73,7 +73,7 @@ function LoginScreen() {
           </svg>
         </div>
         <h1 className="text-[24px] font-semibold tracking-tight text-zinc-900">
-          Kira
+          Tessera
         </h1>
         <p className="mt-1 text-[14px] text-zinc-400">
           Your AI health companion
@@ -150,7 +150,7 @@ function DemoApp() {
             </svg>
           </div>
           <span className="text-sm font-semibold tracking-tight text-zinc-900">
-            Kira
+            Tessera
           </span>
         </div>
         <div className="w-12" />

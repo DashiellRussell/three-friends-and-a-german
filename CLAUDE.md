@@ -4,17 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Kira — AI Health Companion** built for the Mistral AI Worldwide Hackathon (Sydney). Provides voice-based daily health check-ins, proactive outbound health calls, text check-ins with AI conversation, medical document upload and analysis, critical symptom flagging, health trend tracking, and doctor report PDF generation.
+**Tessera — AI Health Companion** built for the Mistral AI Worldwide Hackathon (Sydney). Provides voice-based daily health check-ins, proactive outbound health calls, text check-ins with AI conversation, medical document upload and analysis, critical symptom flagging, health trend tracking, and doctor report PDF generation.
 
 ## Commands
 
 ### Frontend (`frontend/`)
+
 - `cd frontend && pnpm dev` — start Next.js dev server (localhost:3000)
 - `cd frontend && pnpm build` — production build
 - `cd frontend && pnpm lint` — run ESLint
 - `cd frontend && pnpm start` — serve production build
 
 ### Backend (`backend/`)
+
 - `cd backend && npm run dev` — start Express dev server with ts-node-dev (localhost:3001)
 - `cd backend && npm run build` — compile TypeScript
 - `cd backend && npm start` — run compiled output
@@ -22,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech Stack
 
 ### Frontend
+
 - **Framework:** Next.js 16 (App Router, `frontend/src/` directory)
 - **Language:** TypeScript (strict mode), React 19
 - **Styling:** Tailwind CSS v4 (via `@tailwindcss/postcss`)
@@ -34,6 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Path alias:** `@/*` maps to `./src/*`
 
 ### Backend
+
 - **Framework:** Express 4.21.2 with TypeScript
 - **AI:** `@mistralai/mistralai` 1.5.0 for LLM structured extraction, embeddings, chat, and summarization
 - **Database:** `@supabase/supabase-js` 2.49.4 (service role client, bypasses RLS)
@@ -45,6 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Dev server:** ts-node-dev (auto-restart on changes)
 
 ### Infrastructure
+
 - **Database:** Supabase (PostgreSQL + pgvector + Auth + Storage + Realtime)
 - **Voice/Phone:** ElevenLabs (conversational AI, WebRTC, TTS) + Twilio (telephony)
 - **Deployment:** Vercel (frontend) + Railway (backend) + Supabase (managed DB)
@@ -53,6 +58,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 ### Monorepo Structure
+
 ```
 three-friends-and-a-german/
 ├── frontend/          — Next.js app (pnpm)
@@ -65,6 +71,7 @@ three-friends-and-a-german/
 ```
 
 ### Frontend (`frontend/src/`)
+
 ```
 app/
 ├── layout.tsx              — Root layout with Geist fonts + UserProvider
@@ -97,6 +104,7 @@ lib/
 ```
 
 ### Backend (`backend/src/`)
+
 ```
 index.ts                    — Express app entry point (port 3001, CORS)
 middleware/
@@ -119,23 +127,25 @@ services/
 ```
 
 ### Database Schema (`backend/schema.sql`)
+
 7 tables with RLS policies:
 
-| Table | Purpose | Embeddings |
-|-------|---------|-----------|
-| `profiles` | User identity, health profile, onboarding state | No |
-| `check_ins` | Daily health logs (mood, energy, sleep, transcript, flagged) | 1024-dim |
-| `symptoms` | Extracted symptoms with severity, criticality, alerts | No |
-| `documents` | Uploaded medical docs (lab/prescription/imaging/discharge) | 1024-dim |
-| `document_chunks` | RAG chunks for document similarity search | 1024-dim |
-| `reports` | Generated PDF reports (pending/generating/completed/failed) | No |
-| `outbound_calls` | Phone call logs with ElevenLabs conversation + Twilio SIDs | No |
+| Table             | Purpose                                                      | Embeddings |
+| ----------------- | ------------------------------------------------------------ | ---------- |
+| `profiles`        | User identity, health profile, onboarding state              | No         |
+| `check_ins`       | Daily health logs (mood, energy, sleep, transcript, flagged) | 1024-dim   |
+| `symptoms`        | Extracted symptoms with severity, criticality, alerts        | No         |
+| `documents`       | Uploaded medical docs (lab/prescription/imaging/discharge)   | 1024-dim   |
+| `document_chunks` | RAG chunks for document similarity search                    | 1024-dim   |
+| `reports`         | Generated PDF reports (pending/generating/completed/failed)  | No         |
+| `outbound_calls`  | Phone call logs with ElevenLabs conversation + Twilio SIDs   | No         |
 
 **RPC functions:** `match_document_chunks()`, `match_check_ins()` for pgvector similarity search.
 
 ### Key Data Flows
 
 **Voice Check-in (WebRTC):**
+
 ```
 Frontend → GET /api/voice/signed-url → ElevenLabs WebRTC session
 → User speaks ↔ AI agent responds (real-time transcript)
@@ -144,6 +154,7 @@ Frontend → GET /api/voice/signed-url → ElevenLabs WebRTC session
 ```
 
 **Outbound Proactive Call:**
+
 ```
 POST /api/voice/outbound-call { phone_number }
 → Fetch recent check-ins + symptoms → build health context
@@ -154,6 +165,7 @@ POST /api/voice/outbound-call { phone_number }
 ```
 
 **Text Check-in:**
+
 ```
 POST /api/checkin { transcript }
 → extractCheckinData() → structured output (mood, energy, sleep, symptoms, flags)
@@ -162,6 +174,7 @@ POST /api/checkin { transcript }
 ```
 
 **Document Upload:**
+
 ```
 POST /api/documents/upload (multipart: file + document_text)
 → Store PDF to Supabase Storage (medical-documents bucket)
@@ -171,6 +184,7 @@ POST /api/documents/upload (multipart: file + document_text)
 ```
 
 **Report Generation:**
+
 ```
 GET /api/reports/generate?timeRange=week&detailLevel=summary
 → Fetch profile, check-ins, symptoms, documents in range
@@ -182,17 +196,20 @@ GET /api/reports/generate?timeRange=week&detailLevel=summary
 ### API Endpoints
 
 **Public (no auth):**
+
 - `GET /ping` — health check
 - `POST /api/profiles/login` — email-based login (find or create user)
 - `POST /api/voice/webhook/call-complete` — ElevenLabs webhook
 - `POST /api/voice/backfill` — admin: sync all incomplete calls
 
 **Profiles (auth required):**
+
 - `GET /api/profiles` — get own profile
 - `PATCH /api/profiles` — update profile fields
 - `POST /api/profiles/onboarding` — track onboarding progress
 
 **Check-ins (auth required):**
+
 - `GET /api/checkin` — list check-ins (pagination: limit, offset) with nested symptoms
 - `GET /api/checkin/:id` — single check-in
 - `POST /api/checkin` — create check-in from transcript (Mistral extraction + embedding)
@@ -202,23 +219,27 @@ GET /api/reports/generate?timeRange=week&detailLevel=summary
 - `POST /api/checkin/chat/message` — continue AI conversation (generate reply)
 
 **Symptoms (auth required):**
+
 - `GET /api/symptoms` — list symptoms (filters: alerts_only, dismissed)
 - `GET /api/symptoms/alerts` — critical alerts only
 - `PATCH /api/symptoms/:id/dismiss` — dismiss alert
 - `GET /api/symptoms/frequency` — top symptoms by frequency
 
 **Documents (auth required):**
+
 - `GET /api/documents` — list user documents
 - `GET /api/documents/:id` — single document
 - `POST /api/documents/upload` — upload + AI summarize + embed
 
 **Reports (auth required):**
+
 - `GET /api/reports` — list reports
 - `GET /api/reports/:id` — single report
 - `POST /api/reports` — create report record (pending status)
 - `GET /api/reports/generate` — generate + download PDF immediately
 
 **Voice (auth required):**
+
 - `GET /api/voice/signed-url` — get ElevenLabs WebRTC signed URL + dynamic variables
 - `POST /api/voice/outbound-call` — initiate proactive health call
 - `GET /api/voice/calls` — list outbound calls
@@ -231,14 +252,14 @@ GET /api/reports/generate?timeRange=week&detailLevel=summary
 
 All LLM calls go through the Mistral service. Key functions:
 
-| Function | Model | Purpose |
-|----------|-------|---------|
-| `embedText(text)` | `mistral-embed` | Generate 1024-dim vector for similarity search |
-| `extractCheckinData(transcript)` | `mistral-large-latest` | Structured extraction: mood, energy, sleep, symptoms, flags (Zod schema) |
-| `generateConversationContext(checkIns)` | `mistral-large-latest` | Build 150-250 word system prompt from last 7 days for voice AI |
-| `summarizeDocument(text)` | `mistral-large-latest` | 3-5 sentence medical document summary |
-| `generateChatOpener(systemPrompt)` | `mistral-large-latest` | AI's opening greeting for voice check-in |
-| `generateChatReply(systemPrompt, history)` | `mistral-large-latest` | Continue multi-turn conversation |
+| Function                                   | Model                  | Purpose                                                                  |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------ |
+| `embedText(text)`                          | `mistral-embed`        | Generate 1024-dim vector for similarity search                           |
+| `extractCheckinData(transcript)`           | `mistral-large-latest` | Structured extraction: mood, energy, sleep, symptoms, flags (Zod schema) |
+| `generateConversationContext(checkIns)`    | `mistral-large-latest` | Build 150-250 word system prompt from last 7 days for voice AI           |
+| `summarizeDocument(text)`                  | `mistral-large-latest` | 3-5 sentence medical document summary                                    |
+| `generateChatOpener(systemPrompt)`         | `mistral-large-latest` | AI's opening greeting for voice check-in                                 |
+| `generateChatReply(systemPrompt, history)` | `mistral-large-latest` | Continue multi-turn conversation                                         |
 
 **Voice route also uses:** `parseTranscriptWithMistral(transcript)` — extracts check-in data + symptoms array from outbound call transcripts with Mistral structured JSON output. Biases toward false positives for critical symptom flagging.
 
@@ -260,12 +281,14 @@ All LLM calls go through the Mistral service. Key functions:
 ## Authentication & User Identity
 
 ### Login Flow
+
 1. User enters email on demo page → `POST /api/profiles/login`
 2. Backend finds or creates profile by email → returns `UserProfile`
-3. Frontend stores profile in localStorage (`kira_user` key) via `UserProvider`
+3. Frontend stores profile in localStorage (`Tessera_user` key) via `UserProvider`
 4. All subsequent API calls include `x-user-id` header (dev mode) or `Authorization: Bearer <token>` (production)
 
 ### UserProfile Shape
+
 ```typescript
 {
   id, email, display_name, date_of_birth, blood_type,
@@ -276,12 +299,14 @@ All LLM calls go through the Mistral service. Key functions:
 ```
 
 ### Auth Middleware (`backend/src/middleware/auth.ts`)
+
 - Dev mode: reads `x-user-id` or `uuid` header directly
 - Production: validates Supabase JWT from `Authorization: Bearer <token>`
 - All protected routes use `requireAuth` middleware
 - Unprotected: `POST /api/profiles/login`, `POST /api/voice/webhook/*`, `POST /api/voice/backfill`
 
 ### User Filtering
+
 - All backend queries MUST filter by `req.userId` — never return data from other users
 - Frontend components use `useUser()` hook for user ID
 - Pass `x-user-id` header on every authenticated request
@@ -289,6 +314,7 @@ All LLM calls go through the Mistral service. Key functions:
 ## Environment Variables
 
 ### Backend (`backend/.env`)
+
 ```
 MISTRAL_API_KEY
 SUPABASE_URL
@@ -306,6 +332,7 @@ FRONTEND_URL                     # CORS origin, default localhost:3000
 ```
 
 ### Frontend (`frontend/.env.local`)
+
 ```
 NEXT_PUBLIC_BACKEND_URL          # Default http://localhost:3001
 NEXT_PUBLIC_SUPABASE_URL
@@ -315,6 +342,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 ## Current Implementation Status
 
 ### Fully Implemented
+
 - **Authentication:** Email-based login, UserProvider context, localStorage persistence, dev shortcut + JWT auth middleware
 - **Profiles:** Create/read/update profiles + onboarding workflow with resumable state
 - **Voice Check-ins (WebRTC):** ElevenLabs signed URL generation, real-time bidirectional transcript, dynamic variables (user_name, conditions, allergies), auto-save via agent tool callback
@@ -337,6 +365,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 - **Backfill Endpoint:** Admin tool to sync all incomplete/unparsed calls
 
 ### Partially Implemented
+
 - **Document Upload:** File storage + summarization works, but OCR/text extraction relies on frontend sending `document_text` manually (no server-side PDF parsing)
 - **Document Chunking:** `document_chunks` table + `match_document_chunks()` RPC exist but chunking logic is not implemented in upload route
 - **Document Findings:** `findings` JSONB field exists but is never populated (no lab value/imaging result extraction)
@@ -345,6 +374,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 - **Chat Mode UI:** Text input works but uses hardcoded mock responses (not connected to `/api/checkin/chat/*` endpoints)
 
 ### Not Yet Implemented
+
 - **OCR Pipeline:** Server-side PDF text extraction (currently frontend responsibility)
 - **Document Chunking Pipeline:** Split large docs into chunks with per-chunk embeddings
 - **Report RAG Retrieval:** Vector similarity search to enrich reports with relevant past documents/check-ins
@@ -366,11 +396,11 @@ See `DEPLOYMENT.md` for full production deployment guide.
 
 This project supports Mistral Vibe CLI with 4 specialized agent profiles defined in `.vibe/agents/`:
 
-| Agent | Purpose |
-|-------|---------|
-| Report Generation | Synthesize health timeline into structured doctor reports |
-| Symptom Extraction | Parse voice transcripts into structured health data (Pydantic models) |
-| Document Analysis | Process medical docs: chunk, embed, OCR (Pixtral), contextual summaries |
-| Triage & Flagging | Evaluate symptom urgency, flag critical conditions, trigger outbound calls |
+| Agent              | Purpose                                                                    |
+| ------------------ | -------------------------------------------------------------------------- |
+| Report Generation  | Synthesize health timeline into structured doctor reports                  |
+| Symptom Extraction | Parse voice transcripts into structured health data (Pydantic models)      |
+| Document Analysis  | Process medical docs: chunk, embed, OCR (Pixtral), contextual summaries    |
+| Triage & Flagging  | Evaluate symptom urgency, flag critical conditions, trigger outbound calls |
 
 See `AGENTS.md` for workspace rules and `.vibe/` for agent profiles and config. All agents use `mistral-large-latest` in safe mode.

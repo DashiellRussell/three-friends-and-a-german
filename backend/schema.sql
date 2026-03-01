@@ -1,5 +1,5 @@
 -- ============================================================
--- Kira Health Companion — Supabase Schema
+-- Tessera Health Companion — Supabase Schema
 -- 7 tables · pgvector · RLS on all tables
 -- ============================================================
 
