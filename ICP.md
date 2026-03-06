@@ -1,5 +1,9 @@
 # Tessera — Ideal Customer Profile (ICP)
 
+## Problem Statement
+
+Tessera solves the problem of untracked health between doctor appointments — where symptoms go unrecorded, medication adherence slips, and warning signs are missed because doctors only get 10 minutes every few months and the patients who need monitoring most (elderly individuals with chronic conditions) are the least likely to use a health app. Tessera solves this by inverting the interaction model: instead of requiring patients to open an app, it proactively calls them daily via an AI-powered voice conversation that feels like a natural check-in, then automatically extracts structured clinical data (mood, energy, sleep, symptoms, medication adherence) from that conversation, flags critical symptoms in real-time, and generates printable doctor-ready PDF reports — all with zero cognitive load or tech literacy required. It solves this problem primarily for elderly patients aged 65–85+ living with chronic conditions like diabetes, hypertension, and heart disease, who value phone calls over screens and want someone to check in on them without sacrificing their independence; secondarily for their adult children and caregivers (aged 35–55) who worry about a parent's health from a distance and need passive monitoring with critical alerts; and tertiary for healthcare providers (GPs, geriatricians, aged care teams) who need structured longitudinal health data between appointments to make better-informed clinical decisions.
+
 ## The Core Problem
 
 Doctors get 10 minutes every few months. Between appointments, symptoms go untracked, medication adherence slips, and warning signs get missed. The patients who need monitoring most — elderly individuals with chronic conditions — are the least likely to use a health app daily. They don't want another screen to navigate. They just want someone to check in.
