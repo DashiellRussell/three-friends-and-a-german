@@ -28,7 +28,8 @@ import type { ReactNode } from "react";
 import { VoiceSphere } from "@/components/app/VoiceSphere";
 import { Sparkline } from "@/components/app/shared";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 // ─── How It Works Step ──────────────────────────────────────
 function HowItWorksStep({
@@ -83,7 +84,9 @@ function FeatureRow({
       </div>
       <div className="min-w-0">
         <h3 className="text-[14px] font-semibold text-zinc-900">{title}</h3>
-        <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{description}</p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">
+          {description}
+        </p>
       </div>
     </div>
   );
@@ -145,7 +148,10 @@ function WaitlistSection() {
   };
 
   return (
-    <section id="waitlist" className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
+    <section
+      id="waitlist"
+      className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="overflow-hidden rounded-3xl bg-zinc-900 px-5 py-12 text-center sm:px-16 sm:py-16">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
           <Sparkles className="h-6 w-6 text-white" strokeWidth={1.5} />
@@ -201,9 +207,7 @@ function WaitlistSection() {
           </form>
         )}
 
-        {error && (
-          <p className="mt-3 text-xs text-red-400">{error}</p>
-        )}
+        {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
 
         <p className="mt-6 text-xs text-zinc-600">
           No spam. Unsubscribe anytime. Tessera does not replace medical advice.
@@ -216,11 +220,26 @@ function WaitlistSection() {
 // ─── Conversation Preview ───────────────────────────────────
 function ConversationPreview() {
   const messages = [
-    { from: "tessera", text: "Good morning, Margaret. How are you feeling today?" },
-    { from: "user", text: "Oh, not too bad. My knee's been playing up again though." },
-    { from: "tessera", text: "Sorry to hear that. Is it worse than last week, or about the same?" },
-    { from: "user", text: "A bit worse I think. And I didn't sleep great — maybe five hours." },
-    { from: "tessera", text: "I'll make a note of that. Have you been able to take your morning tablets today?" },
+    {
+      from: "tessera",
+      text: "Good morning, Margaret. How are you feeling today?",
+    },
+    {
+      from: "user",
+      text: "Oh, not too bad. My knee's been playing up again though.",
+    },
+    {
+      from: "tessera",
+      text: "Sorry to hear that. Is it worse than last week, or about the same?",
+    },
+    {
+      from: "user",
+      text: "A bit worse I think. And I didn't sleep great — maybe five hours.",
+    },
+    {
+      from: "tessera",
+      text: "I'll make a note of that. Have you been able to take your morning tablets today?",
+    },
     { from: "user", text: "Yes, all taken with breakfast." },
   ];
 
@@ -233,8 +252,12 @@ function ConversationPreview() {
             <Phone className="h-4 w-4 text-emerald-600" strokeWidth={2} />
           </div>
           <div>
-            <div className="text-[13px] font-medium text-zinc-900">Tessera Health Check-in</div>
-            <div className="text-[11px] text-zinc-400">Daily call · 2 min 14 sec</div>
+            <div className="text-[13px] font-medium text-zinc-900">
+              Tessera Health Check-in
+            </div>
+            <div className="text-[11px] text-zinc-400">
+              Daily call · 2 min 14 sec
+            </div>
           </div>
         </div>
         {/* Messages */}
@@ -262,14 +285,16 @@ function ConversationPreview() {
             Automatically captured
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {["Knee pain ↑", "Sleep: 5h", "Mood: okay", "Meds: taken"].map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600"
-              >
-                {tag}
-              </span>
-            ))}
+            {["Knee pain ↑", "Sleep: 5h", "Mood: okay", "Meds: taken"].map(
+              (tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600"
+                >
+                  {tag}
+                </span>
+              ),
+            )}
           </div>
         </div>
       </div>
@@ -280,19 +305,49 @@ function ConversationPreview() {
 // ─── Preview stat cards ─────────────────────────────────────
 function PreviewStatCards() {
   const stats = [
-    { label: "Check-in Streak", value: "12", unit: "days", trend: "Active", highlight: true },
-    { label: "Avg Energy", value: "7.2", unit: "/10", trend: "Stable", highlight: false },
-    { label: "Med Adherence", value: "94", unit: "%", trend: "On track", highlight: false },
+    {
+      label: "Check-in Streak",
+      value: "12",
+      unit: "days",
+      trend: "Active",
+      highlight: true,
+    },
+    {
+      label: "Avg Energy",
+      value: "7.2",
+      unit: "/10",
+      trend: "Stable",
+      highlight: false,
+    },
+    {
+      label: "Med Adherence",
+      value: "94",
+      unit: "%",
+      trend: "On track",
+      highlight: false,
+    },
   ];
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
       {stats.map((s) => (
-        <div key={s.label} className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4">
-          <div className="mb-1 text-[9px] font-medium uppercase tracking-widest text-zinc-500 sm:text-[10px]">{s.label}</div>
-          <div className="text-lg font-semibold tracking-tight text-zinc-100 sm:text-[22px]">
-            {s.value}<span className="text-[10px] text-zinc-500 sm:text-[11px]">{s.unit}</span>
+        <div
+          key={s.label}
+          className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4"
+        >
+          <div className="mb-1 text-[9px] font-medium uppercase tracking-widest text-zinc-500 sm:text-[10px]">
+            {s.label}
           </div>
-          <div className={`mt-0.5 text-[9px] font-medium sm:text-[10px] ${s.highlight ? "text-emerald-500" : "text-zinc-500"}`}>{s.trend}</div>
+          <div className="text-lg font-semibold tracking-tight text-zinc-100 sm:text-[22px]">
+            {s.value}
+            <span className="text-[10px] text-zinc-500 sm:text-[11px]">
+              {s.unit}
+            </span>
+          </div>
+          <div
+            className={`mt-0.5 text-[9px] font-medium sm:text-[10px] ${s.highlight ? "text-emerald-500" : "text-zinc-500"}`}
+          >
+            {s.trend}
+          </div>
         </div>
       ))}
     </div>
@@ -302,12 +357,15 @@ function PreviewStatCards() {
 function PreviewLatestEntry() {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-      <div className="mb-2 text-[10px] font-medium uppercase tracking-widest text-zinc-500">Latest Check-in</div>
+      <div className="mb-2 text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+        Latest Check-in
+      </div>
       <div className="flex items-center gap-2.5">
         <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
         <div>
           <div className="text-[13px] font-medium text-zinc-200">
-            Today <span className="text-zinc-600">·</span> <span className="text-zinc-400">Good</span>
+            Today <span className="text-zinc-600">·</span>{" "}
+            <span className="text-zinc-400">Good</span>
           </div>
           <div className="text-[11px] text-zinc-500">
             9:14 AM · Energy 7/10 · 7.5h sleep
@@ -315,7 +373,8 @@ function PreviewLatestEntry() {
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-        Feeling well-rested. Mild knee stiffness this morning. Took all medications with breakfast.
+        Feeling well-rested. Mild knee stiffness this morning. Took all
+        medications with breakfast.
       </p>
     </div>
   );
@@ -326,8 +385,17 @@ function PreviewEnergySparkline() {
   const labels = ["", "", "", "", "", "", "", "", "", "", "", "", "", "Today"];
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-      <div className="mb-3 text-[13px] font-semibold text-zinc-200">Energy Over Time</div>
-      <Sparkline data={data} labels={labels} color="#a1a1aa" fill height={48} highlight={data.length - 1} />
+      <div className="mb-3 text-[13px] font-semibold text-zinc-200">
+        Energy Over Time
+      </div>
+      <Sparkline
+        data={data}
+        labels={labels}
+        color="#a1a1aa"
+        fill
+        height={48}
+        highlight={data.length - 1}
+      />
     </div>
   );
 }
@@ -340,7 +408,8 @@ function PreviewAlertCard() {
         <span className="text-[12px] font-semibold text-amber-300">Alert</span>
       </div>
       <p className="text-[12px] leading-relaxed text-amber-200/70">
-        Knee pain has increased over 3 consecutive check-ins. Sleep has dropped below 6 hours twice this week. Consider discussing with GP.
+        Knee pain has increased over 3 consecutive check-ins. Sleep has dropped
+        below 6 hours twice this week. Consider discussing with GP.
       </p>
     </div>
   );
@@ -357,21 +426,27 @@ export default function Home() {
       accent: "bg-emerald-50",
     },
     {
-      icon: <MessageCircle className="h-5 w-5 text-violet-600" strokeWidth={1.8} />,
+      icon: (
+        <MessageCircle className="h-5 w-5 text-violet-600" strokeWidth={1.8} />
+      ),
       title: "Natural conversation",
       description:
         "No questionnaires or rating scales. Just a friendly voice asking how they're doing today.",
       accent: "bg-violet-50",
     },
     {
-      icon: <AlertTriangle className="h-5 w-5 text-amber-600" strokeWidth={1.8} />,
+      icon: (
+        <AlertTriangle className="h-5 w-5 text-amber-600" strokeWidth={1.8} />
+      ),
       title: "Symptom tracking",
       description:
         "Patterns are spotted automatically — worsening pain, declining sleep, recurring issues. Nothing slips through.",
       accent: "bg-amber-50",
     },
     {
-      icon: <ClipboardList className="h-5 w-5 text-sky-600" strokeWidth={1.8} />,
+      icon: (
+        <ClipboardList className="h-5 w-5 text-sky-600" strokeWidth={1.8} />
+      ),
       title: "Doctor-ready reports",
       description:
         "One-page health summaries they can print and bring to their next appointment. No tech required.",
@@ -407,13 +482,13 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
+            {/* <Link
               href="/app"
               className="hidden items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 sm:flex"
             >
               <Play className="h-3 w-3" />
               Try the demo
-            </Link>
+            </Link> */}
             <a
               href="#waitlist"
               className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
@@ -441,9 +516,9 @@ export default function Home() {
         </h1>
 
         <p className="mt-5 max-w-xl text-[15px] text-zinc-500 leading-relaxed sm:mt-6 sm:text-lg">
-          Tessera calls your loved one each day, has a friendly conversation about
-          how they&apos;re feeling, and turns it into health data their doctor can
-          actually use. They just answer the phone.
+          Tessera calls your loved one each day, has a friendly conversation
+          about how they&apos;re feeling, and turns it into health data their
+          doctor can actually use. They just answer the phone.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:gap-4">
@@ -454,13 +529,13 @@ export default function Home() {
             Get started free
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </a>
-          <Link
+          {/* <Link
             href="/app"
             className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-6 py-3 text-[14px] font-medium text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
           >
             <Play className="h-3.5 w-3.5" />
             Try the demo
-          </Link>
+          </Link> */}
         </div>
 
         <div className="relative mt-10 sm:mt-14">
@@ -503,19 +578,55 @@ export default function Home() {
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[14px] leading-relaxed text-zinc-500 sm:text-base">
             Between appointments, symptoms go untracked. Medication gets missed.
-            Warning signs slip through the cracks. The patients who need monitoring
-            most are the least likely to use a health app every day.
+            Warning signs slip through the cracks. The patients who need
+            monitoring most are the least likely to use a health app every day.
           </p>
           <div className="mx-auto mt-8 grid max-w-lg gap-3 text-left sm:mt-10 sm:grid-cols-2 sm:gap-4">
             {[
-              { text: "Forgets to mention symptoms at appointments", icon: <MessageSquareOff className="h-4 w-4 text-zinc-400" strokeWidth={1.8} /> },
-              { text: "Health apps are too confusing to use daily", icon: <Smartphone className="h-4 w-4 text-zinc-400" strokeWidth={1.8} /> },
-              { text: "Downplays problems — \"I'm fine, dear\"", icon: <UserX className="h-4 w-4 text-zinc-400" strokeWidth={1.8} /> },
-              { text: "No structured record between visits", icon: <ClipboardX className="h-4 w-4 text-zinc-400" strokeWidth={1.8} /> },
+              {
+                text: "Forgets to mention symptoms at appointments",
+                icon: (
+                  <MessageSquareOff
+                    className="h-4 w-4 text-zinc-400"
+                    strokeWidth={1.8}
+                  />
+                ),
+              },
+              {
+                text: "Health apps are too confusing to use daily",
+                icon: (
+                  <Smartphone
+                    className="h-4 w-4 text-zinc-400"
+                    strokeWidth={1.8}
+                  />
+                ),
+              },
+              {
+                text: 'Downplays problems — "I\'m fine, dear"',
+                icon: (
+                  <UserX className="h-4 w-4 text-zinc-400" strokeWidth={1.8} />
+                ),
+              },
+              {
+                text: "No structured record between visits",
+                icon: (
+                  <ClipboardX
+                    className="h-4 w-4 text-zinc-400"
+                    strokeWidth={1.8}
+                  />
+                ),
+              },
             ].map((item) => (
-              <div key={item.text} className="flex items-start gap-3 rounded-xl border border-zinc-100 bg-white p-3.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50">{item.icon}</div>
-                <p className="text-[13px] leading-snug text-zinc-600">{item.text}</p>
+              <div
+                key={item.text}
+                className="flex items-start gap-3 rounded-xl border border-zinc-100 bg-white p-3.5"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50">
+                  {item.icon}
+                </div>
+                <p className="text-[13px] leading-snug text-zinc-600">
+                  {item.text}
+                </p>
               </div>
             ))}
           </div>
@@ -542,19 +653,28 @@ export default function Home() {
         <div className="grid gap-8 sm:grid-cols-3 sm:gap-6">
           <HowItWorksStep
             number="1"
-            icon={<PhoneCall className="h-7 w-7 text-emerald-600" strokeWidth={1.5} />}
+            icon={
+              <PhoneCall
+                className="h-7 w-7 text-emerald-600"
+                strokeWidth={1.5}
+              />
+            }
             title="Tessera calls them"
             description="A friendly AI calls at their preferred time each day. They just answer the phone and chat."
           />
           <HowItWorksStep
             number="2"
-            icon={<Heart className="h-7 w-7 text-emerald-600" strokeWidth={1.5} />}
+            icon={
+              <Heart className="h-7 w-7 text-emerald-600" strokeWidth={1.5} />
+            }
             title="They have a conversation"
             description="Two minutes of natural chat about how they're feeling. No forms, no ratings, no screens."
           />
           <HowItWorksStep
             number="3"
-            icon={<Printer className="h-7 w-7 text-emerald-600" strokeWidth={1.5} />}
+            icon={
+              <Printer className="h-7 w-7 text-emerald-600" strokeWidth={1.5} />
+            }
             title="You get the full picture"
             description="Health trends, symptom alerts, and printable doctor reports — all captured automatically."
           />
@@ -564,16 +684,20 @@ export default function Home() {
         <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 sm:mt-14 sm:p-6">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100">
-              <PhoneCall className="h-6 w-6 text-emerald-600" strokeWidth={1.5} />
+              <PhoneCall
+                className="h-6 w-6 text-emerald-600"
+                strokeWidth={1.5}
+              />
             </div>
             <div>
               <h3 className="mb-1 text-[15px] font-semibold text-zinc-900">
                 Try it yourself first
               </h3>
               <p className="text-[13px] leading-relaxed text-zinc-500 sm:text-sm">
-                When you sign up, Tessera calls <span className="font-medium text-zinc-700">you</span> for
-                a free test check-in — so you can hear exactly what your loved one will
-                experience before setting it up for them.
+                When you sign up, Tessera calls{" "}
+                <span className="font-medium text-zinc-700">you</span> for a
+                free test check-in — so you can hear exactly what your loved one
+                will experience before setting it up for them.
               </p>
             </div>
           </div>
@@ -593,8 +717,8 @@ export default function Home() {
             A conversation, not a questionnaire
           </h2>
           <p className="mx-auto mt-3 max-w-md text-[13px] text-zinc-500 sm:mt-4 sm:text-base">
-            Tessera remembers their conditions, medications, and recent symptoms.
-            Every call picks up where the last one left off.
+            Tessera remembers their conditions, medications, and recent
+            symptoms. Every call picks up where the last one left off.
           </p>
         </div>
         <ConversationPreview />
@@ -613,8 +737,8 @@ export default function Home() {
             Everything between appointments
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-[13px] text-zinc-500 sm:mt-4 sm:text-base">
-            Each daily check-in is a single tile in a mosaic. Together, they reveal
-            the full picture of their health.
+            Each daily check-in is a single tile in a mosaic. Together, they
+            reveal the full picture of their health.
           </p>
         </div>
 
@@ -647,8 +771,8 @@ export default function Home() {
               Stay in the loop without the daily phone call
             </h2>
             <p className="mx-auto mt-3 max-w-md text-[13px] text-zinc-500 sm:mt-4 sm:text-base">
-              Track their health trends, get alerted when something&apos;s off, and
-              download reports for the doctor.
+              Track their health trends, get alerted when something&apos;s off,
+              and download reports for the doctor.
             </p>
           </div>
 
@@ -686,8 +810,8 @@ export default function Home() {
             </h3>
             <p className="text-[13px] leading-relaxed text-zinc-500">
               They answer a phone call. That&apos;s it. No app to download, no
-              passwords to remember, no screens to navigate. Just a friendly voice
-              checking in each day.
+              passwords to remember, no screens to navigate. Just a friendly
+              voice checking in each day.
             </p>
           </div>
           <div className="rounded-2xl border border-zinc-100 bg-white p-6">
@@ -698,22 +822,25 @@ export default function Home() {
               For you, the family
             </h3>
             <p className="text-[13px] leading-relaxed text-zinc-500">
-              See how they&apos;re really doing without the guilt of missing a call.
-              Get emergency alerts if something serious comes up. Prepare for doctor
-              appointments with real data, not guesswork.
+              See how they&apos;re really doing without the guilt of missing a
+              call. Get emergency alerts if something serious comes up. Prepare
+              for doctor appointments with real data, not guesswork.
             </p>
           </div>
           <div className="rounded-2xl border border-zinc-100 bg-white p-6">
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-              <ClipboardList className="h-5 w-5 text-violet-600" strokeWidth={1.8} />
+              <ClipboardList
+                className="h-5 w-5 text-violet-600"
+                strokeWidth={1.8}
+              />
             </div>
             <h3 className="mb-2 text-[15px] font-semibold text-zinc-900">
               For their doctor
             </h3>
             <p className="text-[13px] leading-relaxed text-zinc-500">
-              Instead of a 10-minute snapshot, get weeks of structured health data.
-              Symptom trends, medication adherence, sleep patterns — all in a
-              one-page printable report.
+              Instead of a 10-minute snapshot, get weeks of structured health
+              data. Symptom trends, medication adherence, sleep patterns — all
+              in a one-page printable report.
             </p>
           </div>
         </div>
@@ -732,8 +859,12 @@ export default function Home() {
             <span className="text-sm font-medium text-zinc-400">Tessera</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-zinc-400">
-            <a href="#" className="transition-colors hover:text-zinc-600">Privacy</a>
-            <a href="#" className="transition-colors hover:text-zinc-600">Terms</a>
+            <a href="#" className="transition-colors hover:text-zinc-600">
+              Privacy
+            </a>
+            <a href="#" className="transition-colors hover:text-zinc-600">
+              Terms
+            </a>
           </div>
           <p className="text-xs text-zinc-400">
             Tessera does not provide medical diagnoses.
