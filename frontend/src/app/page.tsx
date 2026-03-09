@@ -482,13 +482,13 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* <Link
+            <Link
               href="/app"
               className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
             >
               <Play className="h-3 w-3" />
               Try the demo
-            </Link> */}
+            </Link>
             <a
               href="#waitlist"
               className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
