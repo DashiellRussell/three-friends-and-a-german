@@ -54,34 +54,59 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Demo mode: auto-login as Margaret via the real auth flow
+  const DEMO_EMAIL = "margaret@tessera.health";
+
+  // Demo mode: always auto-login as Margaret via the real backend
   useEffect(() => {
+    // Check if we already have a valid Margaret session
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        setUser(JSON.parse(stored));
-        setLoading(false);
-        return;
+        const parsed = JSON.parse(stored);
+        if (parsed?.email === DEMO_EMAIL && parsed?.id) {
+          // Verify the stored user still works by hitting the backend
+          fetch(`${BACKEND_URL}/api/profiles`, {
+            headers: { "x-user-id": parsed.id },
+          })
+            .then((res) => {
+              if (res.ok) {
+                return res.json().then((profile: UserProfile) => {
+                  setUser(profile);
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+                });
+              }
+              // Stored user is stale — fall through to fresh login
+              throw new Error("stale");
+            })
+            .catch(() => doLogin())
+            .finally(() => setLoading(false));
+          return;
+        }
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        // ignore
       }
+      // Stored user is not Margaret — clear and re-login
+      localStorage.removeItem(STORAGE_KEY);
     }
-    // No stored session — auto-login as Margaret
-    fetch(`${BACKEND_URL}/api/profiles/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "margaret@tessera.health" }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Auto-login failed");
-        return res.json();
+    doLogin();
+
+    function doLogin() {
+      fetch(`${BACKEND_URL}/api/profiles/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: DEMO_EMAIL }),
       })
-      .then((profile: UserProfile) => {
-        setUser(profile);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+        .then((res) => {
+          if (!res.ok) throw new Error("Auto-login failed");
+          return res.json();
+        })
+        .then((profile: UserProfile) => {
+          setUser(profile);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
   }, []);
 
   const login = async (email: string) => {
