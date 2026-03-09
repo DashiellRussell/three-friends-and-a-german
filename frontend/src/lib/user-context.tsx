@@ -54,16 +54,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session from localStorage on mount
+  // Demo mode: hardcode Margaret's profile
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    }
+    const demoUser: UserProfile = {
+      id: "16a49d8a-a3de-496c-b890-b1cac0caf1b5",
+      email: "margaret@tessera.health",
+      display_name: "Margaret",
+      date_of_birth: null,
+      blood_type: null,
+      conditions: [],
+      allergies: [],
+      phone_number: null,
+      timezone: "Australia/Sydney",
+      emergency_contact: null,
+      checkin_time: null,
+      voice_pref: null,
+      language: "en",
+      onboarding_completed: true,
+      onboarding_step: 5,
+    };
+    setUser(demoUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(demoUser));
     setLoading(false);
   }, []);
 

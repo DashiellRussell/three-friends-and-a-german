@@ -44,8 +44,6 @@ export function Profile() {
   const [docsExpanded, setDocsExpanded] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
-  const [callStatus, setCallStatus] = useState<"idle" | "calling" | "done" | "error">("idle");
-  const [callError, setCallError] = useState<string | null>(null);
   const { show: showToast, ToastEl } = useToast();
 
   // Medication state
@@ -114,39 +112,6 @@ export function Profile() {
     }
   }, [user, showToast]);
 
-  const triggerCall = useCallback(async () => {
-    if (!user) return;
-    setCallStatus("calling");
-    setCallError(null);
-    try {
-      if (!user.phone_number) {
-        throw new Error("Add a phone number to your profile first.");
-      }
-      const res = await apiFetch("/api/voice/outbound-call", {
-        method: "POST",
-        body: JSON.stringify({
-          phone_number: user.phone_number,
-          dynamic_variables: {
-            user_name: user.display_name || "there",
-            conditions: user.conditions?.join(", ") || "none listed",
-            allergies: user.allergies?.join(", ") || "none listed",
-          },
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Call failed (${res.status})`);
-      }
-      setCallStatus("done");
-      showToast("Tessera is calling you now", "success", "Pick up your phone to start the check-in");
-      setTimeout(() => setCallStatus("idle"), 5000);
-    } catch (err) {
-      const msg = (err as Error).message;
-      setCallError(msg);
-      setCallStatus("error");
-      showToast(msg, "error");
-    }
-  }, [user, showToast]);
 
   const displayName = user?.display_name || user?.email?.split("@")[0] || "User";
   const initial = displayName.charAt(0).toUpperCase();
@@ -476,46 +441,19 @@ export function Profile() {
           ))}
         </div>
 
-        {/* Call me button */}
+        {/* Call me button — disabled for demo */}
         <button
-          onClick={triggerCall}
-          disabled={callStatus === "calling"}
-          className={`mt-3 flex w-full items-center gap-4 rounded-2xl p-4 text-left transition-all active:scale-[0.99] ${
-            callStatus === "done"
-              ? "border border-emerald-200 bg-emerald-50"
-              : callStatus === "error"
-                ? "border border-red-200 bg-red-50"
-                : "bg-zinc-900 hover:bg-zinc-800"
-          }`}
+          disabled
+          className="mt-3 flex w-full items-center gap-4 rounded-2xl bg-zinc-900 p-4 text-left opacity-40 cursor-not-allowed"
         >
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-            callStatus === "done" ? "bg-emerald-100" : callStatus === "error" ? "bg-red-100" : "bg-white/10"
-          }`}>
-            {callStatus === "calling" ? (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            ) : callStatus === "done" ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={callStatus === "error" ? "#dc2626" : "#fff"} strokeWidth="1.8" strokeLinecap="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-              </svg>
-            )}
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
           </div>
           <div className="flex-1">
-            <div className={`text-[15px] font-semibold ${
-              callStatus === "done" ? "text-emerald-700" : callStatus === "error" ? "text-red-700" : "text-white"
-            }`}>
-              {callStatus === "calling" ? "Calling…" : callStatus === "done" ? "Call initiated!" : callStatus === "error" ? "Call failed" : "Call me now"}
-            </div>
-            <div className={`mt-0.5 text-xs ${
-              callStatus === "done" ? "text-emerald-600/60" : callStatus === "error" ? "text-red-600/60" : "text-white/50"
-            }`}>
-              {callStatus === "done"
-                ? "Tessera is calling your phone"
-                : callStatus === "error"
-                  ? callError
-                  : "Tessera calls your phone for a hands-free check-in"}
-            </div>
+            <div className="text-[15px] font-semibold text-white">Call me now</div>
+            <div className="mt-0.5 text-xs text-white/50">Disabled for demo</div>
           </div>
         </button>
       </div>

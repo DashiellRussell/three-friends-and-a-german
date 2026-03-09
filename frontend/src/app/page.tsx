@@ -484,7 +484,7 @@ export default function Home() {
           <div className="flex items-center gap-2 sm:gap-3">
             {/* <Link
               href="/app"
-              className="hidden items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 sm:flex"
+              className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
             >
               <Play className="h-3 w-3" />
               Try the demo
