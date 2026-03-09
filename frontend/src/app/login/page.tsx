@@ -8,7 +8,7 @@ import { Mic } from "lucide-react";
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useUser();
-  const [email, setEmail] = useState("");
+  const [email] = useState("margaret@tessera.health");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -42,10 +42,8 @@ export default function LoginPage() {
         <input
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
-          autoFocus
-          className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 text-[15px] text-zinc-900 placeholder:text-zinc-300 outline-none transition-colors focus:border-zinc-400"
+          readOnly
+          className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-[15px] text-zinc-900 outline-none cursor-default"
         />
         {error && (
           <p className="mt-2.5 rounded-xl bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600" style={{ animation: "fadeUp 0.2s ease" }}>
@@ -62,7 +60,7 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-6 text-center text-[12px] text-zinc-300">
-        We&apos;ll create an account if you&apos;re new
+        Demo account
       </p>
     </div>
   );
