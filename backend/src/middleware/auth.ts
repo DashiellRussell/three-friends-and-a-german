@@ -19,13 +19,11 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // Dev shortcut: x-user-id or uuid header (only in non-production)
-  if (process.env.NODE_ENV !== "production") {
-    const devUserId = (req.headers["x-user-id"] || req.headers["uuid"]) as string | undefined;
-    if (devUserId) {
-      req.userId = devUserId;
-      return next();
-    }
+  // x-user-id header shortcut (used by frontend demo mode)
+  const devUserId = (req.headers["x-user-id"] || req.headers["uuid"]) as string | undefined;
+  if (devUserId) {
+    req.userId = devUserId;
+    return next();
   }
 
   // Production: Bearer token from Supabase auth
