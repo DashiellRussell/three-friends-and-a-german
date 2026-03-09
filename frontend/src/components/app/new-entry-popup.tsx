@@ -3,13 +3,11 @@
 export function NewEntryPopup({
   onClose,
   onVoice,
-  onCallMe,
   onChat,
   onUpload,
 }: {
   onClose: () => void;
   onVoice?: () => void;
-  onCallMe?: () => void;
   onChat?: () => void;
   onUpload?: () => void;
 }) {
@@ -60,18 +58,18 @@ export function NewEntryPopup({
             </div>
           </button>
 
-          {/* Call me */}
+          {/* Call me — disabled for demo */}
           <button
-            onClick={() => { onClose(); onCallMe?.(); }}
-            className="flex w-full items-center gap-4 rounded-2xl border border-zinc-100 bg-white p-4 text-left transition-all hover:border-zinc-200 hover:shadow-sm active:scale-[0.99]"
+            disabled
+            className="flex w-full items-center gap-4 rounded-2xl border border-zinc-100 bg-white p-4 text-left opacity-40 cursor-not-allowed"
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-50">
               <svg
                 width="22"
                 height="22"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#10b981"
+                stroke="#a1a1aa"
                 strokeWidth="1.8"
                 strokeLinecap="round"
               >
@@ -79,11 +77,11 @@ export function NewEntryPopup({
               </svg>
             </div>
             <div>
-              <div className="text-[15px] font-semibold text-zinc-900">
+              <div className="text-[15px] font-semibold text-zinc-400">
                 Call me
               </div>
-              <div className="mt-0.5 text-xs text-zinc-400">
-                Tessera calls your phone
+              <div className="mt-0.5 text-xs text-zinc-300">
+                Disabled for demo
               </div>
             </div>
           </button>

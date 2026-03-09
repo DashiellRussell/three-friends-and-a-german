@@ -179,7 +179,6 @@ export default function AppPage() {
         <NewEntryPopup
           onClose={() => setInputOpen(false)}
           onVoice={() => { setVoiceMode(true); setInputOpen(true); }}
-          onCallMe={() => { setCallMode(true); setInputOpen(true); }}
           onChat={() => { setChatMode(true); setInputOpen(true); }}
           onUpload={() => { setUploadMode(true); setInputOpen(true); }}
         />
