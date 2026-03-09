@@ -33,8 +33,8 @@ export function Dashboard({
   useEffect(() => {
     if (!user) return;
     apiFetch("/api/symptoms/alerts")
-      .then((res) => res.json())
-      .then((body) => setAlerts(body.alerts || []))
+      .then((res) => res.ok ? res.json() : null)
+      .then((body) => { if (body) setAlerts(body.alerts || []); })
       .catch(console.error);
   }, [user]);
 
@@ -42,9 +42,9 @@ export function Dashboard({
   useEffect(() => {
     if (!user?.id) return;
     apiFetch("/api/dashboard")
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then((d) => {
-        setData(d);
+        if (d) setData(d);
         setIsLoading(false);
       })
       .catch((err) => {

@@ -8,7 +8,7 @@ interface LatestEntryProps {
 }
 
 export function LatestEntry({ latest, onClick }: LatestEntryProps) {
-  const isLong = latest.summary.length > 80;
+  const isLong = (latest.summary?.length ?? 0) > 80;
   const [expanded, setExpanded] = useState(false);
 
   return (
