@@ -493,7 +493,7 @@ export default function Home() {
               href="#waitlist"
               className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
             >
-              Get started
+              Join waitlist
             </a>
           </div>
         </div>
@@ -526,16 +526,16 @@ export default function Home() {
             href="#waitlist"
             className="group flex items-center gap-2.5 rounded-full bg-zinc-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 hover:shadow-lg hover:shadow-zinc-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
           >
-            Get started free
+            Join the waitlist
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </a>
-          {/* <Link
+          <Link
             href="/app"
             className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-6 py-3 text-[14px] font-medium text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
           >
             <Play className="h-3.5 w-3.5" />
-            Try the demo
-          </Link> */}
+            Test the demo
+          </Link>
         </div>
 
         <div className="relative mt-10 sm:mt-14">

@@ -443,6 +443,11 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
           </button>
         </div>
 
+        {/* Demo disclaimer */}
+        <div className="relative z-10 mx-5 mt-1 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-600">
+          Context is disabled in the demo — voice AI has no patient history
+        </div>
+
         {/* Sphere area */}
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center" style={{ marginTop: showTranscript ? "-10%" : "0", transition: "margin-top 0.4s ease" }}>
           {/* Outer ambient glow */}
@@ -804,7 +809,7 @@ export function InputOverlay({ onClose, startInVoiceMode, startInCallMode, start
         </div>
 
         <div className="mx-5 mt-1 rounded-lg bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-600">
-          AI replies are simulated — live AI chat coming soon
+          Context is disabled in the demo — AI replies are simulated
         </div>
         <div ref={textChatRef} className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-3">
           {chatMsgs.map((m, i) => (
