@@ -11,7 +11,6 @@
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",
     "@elevenlabs/react": "^0.14.1",
-    "axios": "^1.13.6",
     "d3": "^7.9.0",
     "jspdf": "^4.2.0",
     "lucide-react": "^0.575.0",

@@ -250,7 +250,7 @@ async function syncCallFromElevenLabs(
                   notes: mention.notes,
                 });
               }
-              console.log(`[sync] Auto-logged medication "${match.name}" (taken=${mention.taken}) for call ${callId}`);
+              console.log(`[sync] Auto-logged medication for call ${callId}`);
             }
           }
         }
@@ -259,7 +259,7 @@ async function syncCallFromElevenLabs(
       }
     }
 
-    console.log(`[sync] Check-in created: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
+    console.log(`[sync] Check-in created for call ${callId}`);
 
     // Extract + embed + store significant health event chunks (non-blocking)
     if (checkin) {
@@ -466,7 +466,7 @@ router.post("/backfill", requireAuth, async (req: Request, res: Response) => {
               );
             }
 
-            console.log(`[backfill] Parsed: mood=${parsed.mood}, energy=${parsed.energy}, flagged=${parsed.flagged}`);
+            console.log(`[backfill] Parsed check-in for call ${call.id}`);
             results.push({ id: call.id, phase: 2, updated: true, status: "parsed" });
           } catch (err) {
             console.error(`[backfill] Parse failed for ${call.id}:`, (err as Error).message);

@@ -349,7 +349,7 @@ router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: 
                 notes: mention.notes,
               });
             }
-            console.log(`Auto-logged medication "${match.name}" (taken=${mention.taken}) for check-in ${data.id}`);
+            console.log(`Auto-logged ${extracted.medications_mentioned.length} medication(s) for check-in ${data.id}`);
           }
         }
       }

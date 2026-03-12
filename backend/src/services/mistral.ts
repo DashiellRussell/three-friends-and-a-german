@@ -201,7 +201,7 @@ Given the full text of a medical document, produce a concise summary that captur
 export async function generateChatOpener(
   systemPrompt: string,
 ): Promise<string> {
-  console.log("Generating chat opener with system prompt:", systemPrompt);
+  console.log("Generating chat opener...");
   const client = getMistral();
   const response = await client.chat.complete({
     model: "mistral-large-latest",
