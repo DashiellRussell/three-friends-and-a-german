@@ -277,6 +277,7 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
   const POLL_INTERVAL_MS = 15_000; // check every 15 seconds
   const MAX_POLL_MS = 15 * 60_000; // give up after 15 minutes
   const startTime = Date.now();
+  let errorCount = 0;
 
   const timer = setInterval(async () => {
     try {
@@ -291,6 +292,7 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
       // Still in progress — keep polling
       if (details.status !== "done" && details.status !== "failed") {
         console.log(`[poll] Call ${callId} status: ${details.status}, waiting...`);
+        errorCount = 0;
         return;
       }
 
@@ -299,8 +301,15 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
       clearInterval(timer);
       await syncCallFromElevenLabs(callId, conversationId, userId);
       console.log(`[poll] Call ${callId} synced successfully`);
+      errorCount = 0;
     } catch (err) {
       console.error(`[poll] Error polling call ${callId}:`, (err as Error).message);
+      errorCount++;
+      if (errorCount >= 3) {
+        clearInterval(timer);
+        console.error(`[poll] Stopping poll for call ${callId} after ${errorCount} consecutive failures`);
+        return;
+      }
     }
   }, POLL_INTERVAL_MS);
 }
@@ -309,6 +318,7 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
 // No auth required — called by ElevenLabs servers
 router.post("/webhook/call-complete", async (req: Request, res: Response) => {
   const { conversation_id, transcript, status, duration_seconds } = req.body;
+  const safeTranscript = typeof transcript === "string" ? transcript.slice(0, 50000) : transcript;
 
   // TODO: Add HMAC signature verification when ElevenLabs provides webhook signing
   if (!conversation_id || typeof conversation_id !== "string") {
@@ -333,7 +343,7 @@ router.post("/webhook/call-complete", async (req: Request, res: Response) => {
     const updates: Record<string, unknown> = {
       status: status || "completed",
     };
-    if (transcript) updates.transcript = transcript;
+    if (safeTranscript) updates.transcript = safeTranscript;
     if (duration_seconds) updates.duration_seconds = duration_seconds;
 
     await supabase
@@ -342,11 +352,11 @@ router.post("/webhook/call-complete", async (req: Request, res: Response) => {
       .eq("id", call.id);
 
     // Auto-create a check-in from the call transcript
-    if (transcript) {
+    if (safeTranscript) {
       await supabase.from("check_ins").insert({
         user_id: call.user_id,
         input_mode: "voice",
-        transcript: transcript,
+        transcript: safeTranscript,
         notes: `Outbound call check-in (auto-saved)`,
       });
     }
@@ -635,11 +645,16 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch recent check-ins + symptoms in parallel for context
+    // Fetch profile + recent check-ins + symptoms in parallel for context
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [checkInsResult, symptomsResult, outboundMedsResult] = await Promise.all([
+    const [profileResult, checkInsResult, symptomsResult, outboundMedsResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("display_name, conditions, allergies")
+        .eq("id", userId)
+        .single(),
       supabase
         .from("check_ins")
         .select("created_at, summary, mood, energy, sleep_hours, notes, flagged, flag_reason")
@@ -660,6 +675,7 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
         .eq("active", true),
     ]);
 
+    const profile = profileResult.data;
     const outboundMeds = outboundMedsResult.data || [];
 
     // Build conversational context from check-in history
@@ -712,6 +728,9 @@ router.post("/outbound-call", async (req: Request, res: Response) => {
 
     // Merge dynamic variables with conversational context + instructions
     const enrichedVariables = {
+      user_name: profile?.display_name || "there",
+      conditions: profile?.conditions?.join(", ") || "none listed",
+      allergies: profile?.allergies?.join(", ") || "none listed",
       ...(dynamic_variables || {}),
       medications: outboundMedsStr,
       recent_health_summary: `${outboundContext}\n\n${conversationalInstructions}`,

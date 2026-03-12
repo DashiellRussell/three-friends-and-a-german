@@ -22,6 +22,11 @@ function normalizePhoneNumber(phone: string): string {
   if (!num.startsWith("+")) {
     num = "+" + num;
   }
+  // Validate: must be 10-15 digits (after +)
+  const digitsOnly = num.slice(1);
+  if (!/^\d{10,15}$/.test(digitsOnly)) {
+    throw new Error(`Invalid phone number format: ${phone}`);
+  }
   return num;
 }
 

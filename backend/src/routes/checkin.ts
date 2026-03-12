@@ -283,6 +283,8 @@ router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: 
 
   if (error) throw new Error(error.message);
 
+  let symptomWarning: string | null = null;
+
   // Step 4: insert extracted symptoms into the symptoms table
   if (extracted.symptoms && extracted.symptoms.length > 0 && data) {
     const symptomRows = extracted.symptoms.map((s) => ({
@@ -298,6 +300,7 @@ router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: 
     const { error: symptomError } = await supabase.from("symptoms").insert(symptomRows);
     if (symptomError) {
       console.error("Failed to insert symptoms:", symptomError.message);
+      symptomWarning = "Check-in saved but symptom extraction failed";
     } else {
       console.log(`Created ${symptomRows.length} symptom records for check-in ${data.id}`);
     }
@@ -360,7 +363,8 @@ router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: 
     console.error("Checkin chunking failed:", err.message),
   );
 
-  res.status(201).json({ checkin: data });
+  const status = symptomWarning ? 207 : 201;
+  res.status(status).json({ checkin: data, ...(symptomWarning && { warning: symptomWarning }) });
 });
 
 router.post("/summary", async (req: Request, res: Response) => {

@@ -112,8 +112,11 @@ Medication extraction:
   const parsed = response.choices?.[0]?.message?.parsed;
   if (!parsed) throw new Error("Mistral returned no structured output");
 
-  const validated = CheckInSchema.parse(parsed);
-  return validated;
+  try {
+    return CheckInSchema.parse(parsed);
+  } catch (zodErr) {
+    throw new Error(`Mistral response failed validation: ${(zodErr as Error).message}`);
+  }
 }
 
 export async function generateConversationContext(
