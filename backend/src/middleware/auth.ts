@@ -90,6 +90,11 @@ export async function requireAuth(
         display_name: displayName,
         clerk_user_id: clerkUserId,
         onboarding_completed: false,
+        onboarding_step: 0,
+        timezone: "Australia/Sydney",
+        language: "en",
+        conditions: [],
+        allergies: [],
       })
       .select("id")
       .single();

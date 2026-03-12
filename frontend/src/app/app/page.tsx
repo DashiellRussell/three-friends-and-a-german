@@ -52,7 +52,7 @@ export default function AppPage() {
 
   // Redirect to onboarding if not completed (Clerk middleware handles auth redirect)
   useEffect(() => {
-    if (user && user.onboarding_completed === false) {
+    if (user && !user.onboarding_completed) {
       router.push("/onboarding");
     }
   }, [user, router]);

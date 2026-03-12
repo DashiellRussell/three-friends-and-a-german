@@ -55,16 +55,17 @@ function OnboardingContent() {
   const [voicePref, setVoicePref] = useState("sarah");
   const [language, setLanguage] = useState("en");
 
-  // Load existing profile data for edit mode or resuming
+  // Load existing profile data on initial mount only
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    if (!user) return;
+    if (!user || initialized) return;
+    setInitialized(true);
 
-    // Resume from last step
-    if (user.onboarding_step && user.onboarding_step > 0 && !isEditMode) {
-      setStep(user.onboarding_step);
-    }
+    // Resume from last step or skip welcome in edit mode
     if (isEditMode) {
-      setStep(1); // Skip welcome in edit mode
+      setStep(1);
+    } else if ((user.onboarding_step ?? 0) > 0) {
+      setStep(user.onboarding_step!);
     }
 
     // Pre-fill fields
@@ -82,7 +83,7 @@ function OnboardingContent() {
     if (user.checkin_time) setCheckinTime(user.checkin_time);
     if (user.voice_pref) setVoicePref(user.voice_pref);
     if (user.language) setLanguage(user.language);
-  }, [user, isEditMode]);
+  }, [user, isEditMode, initialized]);
 
   const saveStep = async (nextStep: number) => {
     setSaving(true);
@@ -119,14 +120,16 @@ function OnboardingContent() {
         });
       }
 
-      // Track onboarding progress
-      await apiFetch("/api/profiles/onboarding", {
-        method: "POST",
-        body: JSON.stringify({
-          step: nextStep,
-          completed: nextStep >= TOTAL_STEPS - 1,
-        }),
-      });
+      // Track onboarding progress (skip in edit mode — already completed)
+      if (!isEditMode) {
+        await apiFetch("/api/profiles/onboarding", {
+          method: "POST",
+          body: JSON.stringify({
+            step: nextStep,
+            completed: nextStep >= TOTAL_STEPS - 1,
+          }),
+        });
+      }
 
       await refreshProfile();
       setStep(nextStep);
@@ -137,13 +140,20 @@ function OnboardingContent() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 0) {
       setStep(1); // Welcome screen doesn't save
       return;
     }
     if (step === TOTAL_STEPS - 1) {
-      // Done — redirect to app
+      // Ensure onboarding is marked complete before navigating
+      if (!user?.onboarding_completed) {
+        await apiFetch("/api/profiles/onboarding", {
+          method: "POST",
+          body: JSON.stringify({ step: TOTAL_STEPS - 1, completed: true }),
+        });
+        await refreshProfile();
+      }
       router.push("/app");
       return;
     }
@@ -151,7 +161,11 @@ function OnboardingContent() {
   };
 
   const handleBack = () => {
-    if (step > (isEditMode ? 1 : 0)) {
+    if (isEditMode && step <= 1) {
+      router.push("/app");
+      return;
+    }
+    if (step > 0) {
       setStep(step - 1);
     }
   };
