@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import {
   extractCheckinData,
   embedText,
@@ -13,6 +14,8 @@ import { chunkAndStoreCheckin } from "../services/chunking";
 import { searchAllByText } from "../services/crossReference";
 
 const router = Router();
+
+const checkinLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: "Too many check-ins, please try again later" } });
 
 // Shared conversational instructions appended to generated context for voice & chat sessions.
 // Designed to feel like a natural conversation — no explicit 1-10 rating requests.
@@ -244,7 +247,7 @@ interface CheckInBody {
   transcript: string;
 }
 
-router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
+router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: Response) => {
   const { transcript } = req.body;
   const user_id = req.userId!;
 
@@ -280,6 +283,8 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
 
   if (error) throw new Error(error.message);
 
+  let symptomWarning: string | null = null;
+
   // Step 4: insert extracted symptoms into the symptoms table
   if (extracted.symptoms && extracted.symptoms.length > 0 && data) {
     const symptomRows = extracted.symptoms.map((s) => ({
@@ -295,6 +300,7 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
     const { error: symptomError } = await supabase.from("symptoms").insert(symptomRows);
     if (symptomError) {
       console.error("Failed to insert symptoms:", symptomError.message);
+      symptomWarning = "Check-in saved but symptom extraction failed";
     } else {
       console.log(`Created ${symptomRows.length} symptom records for check-in ${data.id}`);
     }
@@ -343,7 +349,7 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
                 notes: mention.notes,
               });
             }
-            console.log(`Auto-logged medication "${match.name}" (taken=${mention.taken}) for check-in ${data.id}`);
+            console.log(`Auto-logged ${extracted.medications_mentioned.length} medication(s) for check-in ${data.id}`);
           }
         }
       }
@@ -357,7 +363,8 @@ router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
     console.error("Checkin chunking failed:", err.message),
   );
 
-  res.status(201).json({ checkin: data });
+  const status = symptomWarning ? 207 : 201;
+  res.status(status).json({ checkin: data, ...(symptomWarning && { warning: symptomWarning }) });
 });
 
 router.post("/summary", async (req: Request, res: Response) => {

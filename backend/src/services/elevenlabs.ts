@@ -22,6 +22,11 @@ function normalizePhoneNumber(phone: string): string {
   if (!num.startsWith("+")) {
     num = "+" + num;
   }
+  // Validate: must be 10-15 digits (after +)
+  const digitsOnly = num.slice(1);
+  if (!/^\d{10,15}$/.test(digitsOnly)) {
+    throw new Error(`Invalid phone number format: ${phone}`);
+  }
   return num;
 }
 
@@ -54,13 +59,6 @@ export async function getConversationDetails(
     );
   }
   const data = (await res.json()) as ConversationDetails;
-  // Log raw keys on first call so we can see what ElevenLabs actually returns
-  console.log(`[elevenlabs] Conversation ${conversationId} keys:`, Object.keys(data));
-  console.log(`[elevenlabs] Duration fields:`, {
-    call_duration_secs: data.call_duration_secs,
-    duration: data.duration,
-    call_duration: data.call_duration,
-  });
   return data;
 }
 

@@ -2,8 +2,8 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import axios from "axios";
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 type UploadStage = "idle" | "uploading" | "processing";
 
 async function extractPdfText(file: File): Promise<string> {
@@ -77,12 +77,12 @@ export default function UploadCheckinPage() {
       formData.append("document_text", text);
       formData.append("file_name", file.name);
 
-      const { data } = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/documents/upload`,
-        formData,
-        { headers: { "x-user-id": user?.id || "" } },
-      );
-      setStatus("✅ success: " + JSON.stringify(data));
+      const res = await apiFetch("/api/documents/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      setStatus("success: " + JSON.stringify(data));
       setStage("idle");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e) {

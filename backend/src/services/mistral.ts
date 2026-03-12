@@ -112,8 +112,11 @@ Medication extraction:
   const parsed = response.choices?.[0]?.message?.parsed;
   if (!parsed) throw new Error("Mistral returned no structured output");
 
-  const validated = CheckInSchema.parse(parsed);
-  return validated;
+  try {
+    return CheckInSchema.parse(parsed);
+  } catch (zodErr) {
+    throw new Error(`Mistral response failed validation: ${(zodErr as Error).message}`);
+  }
 }
 
 export async function generateConversationContext(
@@ -198,7 +201,7 @@ Given the full text of a medical document, produce a concise summary that captur
 export async function generateChatOpener(
   systemPrompt: string,
 ): Promise<string> {
-  console.log("Generating chat opener with system prompt:", systemPrompt);
+  console.log("Generating chat opener...");
   const client = getMistral();
   const response = await client.chat.complete({
     model: "mistral-large-latest",
