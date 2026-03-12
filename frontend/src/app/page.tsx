@@ -520,16 +520,18 @@ function HomeContent() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             ) : isLoaded && isSignedIn ? (
-              <span className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-zinc-400 sm:px-4 sm:py-2 sm:text-sm">
-                On the waitlist
-              </span>
+              <>
+                <Link href="/demo" className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900">
+                  See demo
+                </Link>
+                <span className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-zinc-400 sm:px-4 sm:py-2 sm:text-sm">
+                  On the waitlist
+                </span>
+              </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
-                >
-                  Sign in
+                <Link href="/demo" className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900">
+                  See demo
                 </Link>
                 <a
                   href="#waitlist"
@@ -575,13 +577,22 @@ function HomeContent() {
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           ) : (
-            <a
-              href="#waitlist"
-              className="group flex items-center gap-2.5 rounded-full bg-zinc-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 hover:shadow-lg hover:shadow-zinc-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
-            >
-              Join the waitlist
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </a>
+            <>
+              <a
+                href="#waitlist"
+                className="group flex items-center gap-2.5 rounded-full bg-zinc-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 hover:shadow-lg hover:shadow-zinc-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
+              >
+                Join the waitlist
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </a>
+              <Link
+                href="/demo"
+                className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-6 py-3 text-[14px] font-medium text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
+              >
+                <Play className="h-3.5 w-3.5" />
+                See the demo
+              </Link>
+            </>
           )}
         </div>
 
@@ -728,7 +739,10 @@ function HomeContent() {
         </div>
 
         {/* First check-in callout */}
-        <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 sm:mt-14 sm:p-6">
+        <Link
+          href="/demo#try-call"
+          className="mx-auto mt-10 block max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 transition-all hover:border-emerald-200 hover:shadow-md sm:mt-14 sm:p-6"
+        >
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100">
               <PhoneCall
@@ -738,17 +752,18 @@ function HomeContent() {
             </div>
             <div>
               <h3 className="mb-1 text-[15px] font-semibold text-zinc-900">
-                Try it yourself first
+                Try a free demo call
               </h3>
               <p className="text-[13px] leading-relaxed text-zinc-500 sm:text-sm">
-                When you sign up, Tessera calls{" "}
-                <span className="font-medium text-zinc-700">you</span> for a
-                free test check-in — so you can hear exactly what your loved one
-                will experience before setting it up for them.
+                Step into a patient&apos;s shoes and experience a real Tessera check-in call.
+                Hear exactly what your loved one will experience.
               </p>
+              <span className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-emerald-600">
+                Try it now <ArrowRight className="h-3.5 w-3.5" />
+              </span>
             </div>
           </div>
-        </div>
+        </Link>
       </section>
 
       {/* Divider */}
