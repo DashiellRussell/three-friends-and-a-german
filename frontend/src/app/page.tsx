@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useAuth, useUser as useClerkUser } from "@clerk/nextjs";
 import {
   Mic,
   Phone,
@@ -415,8 +417,24 @@ function PreviewAlertCard() {
   );
 }
 
+// ─── Beta Access Hook ────────────────────────────────────────
+function useBetaAccess() {
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useClerkUser();
+  const hasBeta = !!(user?.publicMetadata as Record<string, unknown> | undefined)?.closed_beta;
+  return { isSignedIn: !!isSignedIn, isLoaded: !!isLoaded, hasBeta };
+}
+
 // ─── Main Page ───────────────────────────────────────────────
 export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fafafa]" />}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
   const features = [
     {
       icon: <Phone className="h-5 w-5 text-emerald-600" strokeWidth={1.8} />,
@@ -468,8 +486,19 @@ export default function Home() {
     },
   ];
 
+  const { isSignedIn, isLoaded, hasBeta } = useBetaAccess();
+  const searchParams = useSearchParams();
+  const showWaitlistNote = searchParams.get("access") === "waitlist";
+
   return (
     <div className="min-h-screen bg-[#fafafa]">
+      {/* Waitlist-only notice (shown when redirected from /app without beta access) */}
+      {showWaitlistNote && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-700">
+          You&apos;re on the waitlist! We&apos;ll notify you when your account is activated.
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="sticky top-0 z-40 border-b border-zinc-100 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6 sm:py-3.5">
@@ -482,19 +511,34 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/app"
-              className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
-            >
-              <Play className="h-3 w-3" />
-              Try the demo
-            </Link>
-            <a
-              href="#waitlist"
-              className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
-            >
-              Join waitlist
-            </a>
+            {isLoaded && isSignedIn && hasBeta ? (
+              <Link
+                href="/app"
+                className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-emerald-500 active:scale-[0.98] sm:px-5 sm:py-2 sm:text-sm"
+              >
+                Open the app
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            ) : isLoaded && isSignedIn ? (
+              <span className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-zinc-400 sm:px-4 sm:py-2 sm:text-sm">
+                On the waitlist
+              </span>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
+                >
+                  Sign in
+                </Link>
+                <a
+                  href="#waitlist"
+                  className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
+                >
+                  Join waitlist
+                </a>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -522,20 +566,23 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:gap-4">
-          <a
-            href="#waitlist"
-            className="group flex items-center gap-2.5 rounded-full bg-zinc-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 hover:shadow-lg hover:shadow-zinc-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
-          >
-            Join the waitlist
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </a>
-          <Link
-            href="/app"
-            className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-6 py-3 text-[14px] font-medium text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
-          >
-            <Play className="h-3.5 w-3.5" />
-            Test the demo
-          </Link>
+          {isLoaded && isSignedIn && hasBeta ? (
+            <Link
+              href="/app"
+              className="group flex items-center gap-2.5 rounded-full bg-emerald-600 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
+            >
+              Open the app
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          ) : (
+            <a
+              href="#waitlist"
+              className="group flex items-center gap-2.5 rounded-full bg-zinc-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-zinc-800 hover:shadow-lg hover:shadow-zinc-900/10 active:scale-[0.98] sm:px-7 sm:py-3.5 sm:text-[15px]"
+            >
+              Join the waitlist
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </a>
+          )}
         </div>
 
         <div className="relative mt-10 sm:mt-14">
