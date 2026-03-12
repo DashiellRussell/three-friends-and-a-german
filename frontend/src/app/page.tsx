@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useAuth, useUser as useClerkUser } from "@clerk/nextjs";
+import { useAuth, useUser as useClerkUser, SignOutButton } from "@clerk/nextjs";
 import {
   Mic,
   Phone,
@@ -25,6 +25,7 @@ import {
   UserX,
   ClipboardX,
   Bell,
+  LogOut,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { VoiceSphere } from "@/components/app/VoiceSphere";
@@ -912,25 +913,66 @@ function HomeContent() {
       <WaitlistSection />
 
       {/* Footer */}
-      <footer className="border-t border-zinc-100 bg-white px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 sm:flex-row sm:justify-between sm:gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900">
-              <Mic className="h-3 w-3 text-white" strokeWidth={2} />
+      <footer className="border-t border-zinc-100 bg-white px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
+            {/* Brand */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
+                  <Mic className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                </div>
+                <span className="text-[15px] font-semibold text-zinc-900">Tessera</span>
+              </div>
+              <p className="max-w-xs text-[13px] leading-relaxed text-zinc-400">
+                AI-powered daily health check-ins for the people you care about. A phone call, not an app.
+              </p>
             </div>
-            <span className="text-sm font-medium text-zinc-400">Tessera</span>
+
+            {/* Links */}
+            <div className="flex gap-12 sm:gap-16">
+              <div>
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Product</h4>
+                <ul className="space-y-2">
+                  <li><a href="#waitlist" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Join waitlist</a></li>
+                  <li><Link href="/demo" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Demo</Link></li>
+                  <li><Link href="/demo#try-call" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Try a call</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Legal</h4>
+                <ul className="space-y-2">
+                  <li><a href="#" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Privacy</a></li>
+                  <li><a href="#" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Terms</a></li>
+                </ul>
+              </div>
+              {isLoaded && isSignedIn && (
+                <div>
+                  <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Account</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <SignOutButton>
+                        <button className="flex items-center gap-1.5 text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">
+                          <LogOut className="h-3 w-3" />
+                          Log out
+                        </button>
+                      </SignOutButton>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-xs text-zinc-400">
-            <a href="#" className="transition-colors hover:text-zinc-600">
-              Privacy
-            </a>
-            <a href="#" className="transition-colors hover:text-zinc-600">
-              Terms
-            </a>
+
+          {/* Bottom bar */}
+          <div className="mt-8 flex flex-col items-center gap-2 border-t border-zinc-100 pt-6 sm:flex-row sm:justify-between">
+            <p className="text-[11px] text-zinc-400">
+              &copy; {new Date().getFullYear()} Tessera. All rights reserved.
+            </p>
+            <p className="text-[11px] text-zinc-400">
+              Tessera does not provide medical diagnoses or replace professional medical advice.
+            </p>
           </div>
-          <p className="text-xs text-zinc-400">
-            Tessera does not provide medical diagnoses.
-          </p>
         </div>
       </footer>
     </div>

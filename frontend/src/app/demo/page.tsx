@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, SignOutButton } from "@clerk/nextjs";
 import { apiFetch } from "@/lib/api";
 import {
   Mic,
@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Check,
   Loader2,
+  LogOut,
 } from "lucide-react";
 import { VoiceSphere } from "@/components/app/VoiceSphere";
 import { Sparkline } from "@/components/app/shared";
@@ -786,6 +787,7 @@ function DemoCallSection() {
 
 // ─── Main Demo Page ──────────────────────────────────────────
 export default function DemoPage() {
+  const { isSignedIn } = useAuth();
   return (
     <div className="min-h-screen bg-[#fafafa]">
       {/* Nav */}
@@ -1013,15 +1015,66 @@ export default function DemoPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-100 bg-white px-4 py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900">
-              <Mic className="h-3 w-3 text-white" strokeWidth={2} />
+      <footer className="border-t border-zinc-100 bg-white px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
+            {/* Brand */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
+                  <Mic className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                </div>
+                <span className="text-[15px] font-semibold text-zinc-900">Tessera</span>
+              </div>
+              <p className="max-w-xs text-[13px] leading-relaxed text-zinc-400">
+                AI-powered daily health check-ins for the people you care about. A phone call, not an app.
+              </p>
             </div>
-            <span className="text-sm font-medium text-zinc-400">Tessera</span>
+
+            {/* Links */}
+            <div className="flex gap-12 sm:gap-16">
+              <div>
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Product</h4>
+                <ul className="space-y-2">
+                  <li><Link href="/#waitlist" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Join waitlist</Link></li>
+                  <li><Link href="/" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Home</Link></li>
+                  <li><a href="#try-call" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Try a call</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Legal</h4>
+                <ul className="space-y-2">
+                  <li><a href="#" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Privacy</a></li>
+                  <li><a href="#" className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">Terms</a></li>
+                </ul>
+              </div>
+              {isSignedIn && (
+                <div>
+                  <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Account</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <SignOutButton>
+                        <button className="flex items-center gap-1.5 text-[13px] text-zinc-500 transition-colors hover:text-zinc-900">
+                          <LogOut className="h-3 w-3" />
+                          Log out
+                        </button>
+                      </SignOutButton>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
-          <p className="text-xs text-zinc-400">Tessera does not provide medical diagnoses.</p>
+
+          {/* Bottom bar */}
+          <div className="mt-8 flex flex-col items-center gap-2 border-t border-zinc-100 pt-6 sm:flex-row sm:justify-between">
+            <p className="text-[11px] text-zinc-400">
+              &copy; {new Date().getFullYear()} Tessera. All rights reserved.
+            </p>
+            <p className="text-[11px] text-zinc-400">
+              Tessera does not provide medical diagnoses or replace professional medical advice.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
