@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/user-context";
+import { useAuth } from "@clerk/nextjs";
 import { Dashboard } from "@/components/app/Dashboard";
 import { Log } from "@/components/app/log";
 import { Trends } from "@/components/app/trends";
@@ -38,6 +39,7 @@ const NAV_ITEMS: { id: Tab | "input"; label: string; d: string }[] = [
 
 export default function AppPage() {
   const { user, loading } = useUser();
+  const { isLoaded: clerkLoaded } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [targetCheckinId, setTargetCheckinId] = useState<string | null>(null);
@@ -48,21 +50,14 @@ export default function AppPage() {
   const [chatMode, setChatMode] = useState(false);
   const [uploadMode, setUploadMode] = useState(false);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [loading, user, router]);
-
-  // Redirect to onboarding if not completed
+  // Redirect to onboarding if not completed (Clerk middleware handles auth redirect)
   useEffect(() => {
     if (user && user.onboarding_completed === false) {
       router.push("/onboarding");
     }
   }, [user, router]);
 
-  if (loading) {
+  if (loading || !clerkLoaded) {
     return (
       <div className="flex h-dvh items-center justify-center bg-[#fafafa]">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-600" />

@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
 import { useUser } from "@/lib/user-context";
+import { apiFetch } from "@/lib/api";
 
 function TypingIndicator() {
   return (
@@ -45,7 +45,6 @@ export default function TextCheckinPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   const handleDone = async () => {
     if (messages.length === 0) {
@@ -59,10 +58,9 @@ export default function TextCheckinPage() {
       .map((m) => `${m.role === "assistant" ? "AI" : "User"}: ${m.text}`)
       .join("\n");
 
-    await axios.post(`${backendUrl}/api/checkin`, {
-      transcript,
-    }, {
-      headers: { "x-user-id": user?.id || "" },
+    await apiFetch("/api/checkin", {
+      method: "POST",
+      body: JSON.stringify({ transcript }),
     });
 
     setIsSaving(false);
@@ -72,21 +70,17 @@ export default function TextCheckinPage() {
 
   useEffect(() => {
     if (!user) return;
-    const headers = { "x-user-id": user.id };
     const loadContext = async () => {
-      const { data } = await axios.post(
-        `${backendUrl}/api/checkin/summary`,
-        {},
-        { headers },
-      );
+      const res = await apiFetch("/api/checkin/summary", { method: "POST" });
+      const data = await res.json();
       const context = data.context ?? null;
       setSystemContext(context);
       if (context) {
-        const { data: opener } = await axios.post(
-          `${backendUrl}/api/checkin/chat/start`,
-          { systemPrompt: context },
-          { headers },
-        );
+        const openerRes = await apiFetch("/api/checkin/chat/start", {
+          method: "POST",
+          body: JSON.stringify({ systemPrompt: context }),
+        });
+        const opener = await openerRes.json();
         setMessages([{ role: "assistant", text: opener.message }]);
         setIsLoading(false);
         setInitializing(false);
@@ -94,7 +88,7 @@ export default function TextCheckinPage() {
     };
 
     loadContext();
-  }, [user, backendUrl]);
+  }, [user]);
 
   useEffect(() => {
     if (chatRef.current) {
@@ -123,11 +117,11 @@ export default function TextCheckinPage() {
       content: m.text,
     }));
 
-    const { data } = await axios.post(
-      `${backendUrl}/api/checkin/chat/message`,
-      { systemPrompt: systemContext, history },
-      { headers: { "x-user-id": user?.id || "" } },
-    );
+    const res = await apiFetch("/api/checkin/chat/message", {
+      method: "POST",
+      body: JSON.stringify({ systemPrompt: systemContext, history }),
+    });
+    const data = await res.json();
 
     setMessages((prev) => [...prev, { role: "assistant", text: data.message }]);
     setIsLoading(false);

@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
+import { clerkMiddleware } from "@clerk/express";
 
 import { errorHandler } from "./middleware/errorHandler";
 import profiles from "./routes/profiles";
@@ -22,6 +23,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
 app.use(express.json());
+app.use(clerkMiddleware());
 
 // Routes
 app.use("/api/profiles", profiles);

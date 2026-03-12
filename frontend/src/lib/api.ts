@@ -1,10 +1,18 @@
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const STORAGE_KEY = "tessera_user";
+
+type TokenGetter = () => Promise<string | null>;
+let tokenGetter: TokenGetter | null = null;
+
+/**
+ * Called by UserProvider on mount to wire up Clerk's getToken function.
+ */
+export function setTokenGetter(fn: TokenGetter) {
+  tokenGetter = fn;
+}
 
 /**
  * Authenticated fetch helper.
- * Reads user ID from localStorage and attaches x-user-id header.
- * Will switch to Bearer token auth once Supabase SMTP is configured.
+ * Gets a fresh Clerk JWT per request and sets Authorization: Bearer header.
  */
 export async function apiFetch(
   path: string,
@@ -14,17 +22,12 @@ export async function apiFetch(
 
   const headers = new Headers(options.headers);
 
-  // Get user ID from localStorage
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const user = JSON.parse(stored);
-      if (user?.id) {
-        headers.set("x-user-id", user.id);
-      }
+  // Get fresh Clerk JWT
+  if (tokenGetter) {
+    const token = await tokenGetter();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
-  } catch {
-    // ignore parse errors
   }
 
   // Ensure JSON content type for non-FormData requests

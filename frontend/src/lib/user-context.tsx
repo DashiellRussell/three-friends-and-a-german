@@ -7,10 +7,8 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const STORAGE_KEY = "tessera_user";
+import { useAuth, useUser as useClerkUser } from "@clerk/nextjs";
+import { apiFetch, setTokenGetter } from "./api";
 
 export interface UserProfile {
   id: string;
@@ -37,7 +35,6 @@ export interface UserProfile {
 interface UserContextType {
   user: UserProfile | null;
   loading: boolean;
-  login: (email: string) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
 }
@@ -45,7 +42,6 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   user: null,
   loading: true,
-  login: async () => {},
   logout: () => {},
   refreshProfile: async () => {},
 });
@@ -53,98 +49,67 @@ const UserContext = createContext<UserContextType>({
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isSignedIn, isLoaded, getToken, signOut } = useAuth();
+  const { user: clerkUser } = useClerkUser();
 
-  const DEMO_EMAIL = "margaret@tessera.health";
-
-  // Demo mode: always auto-login as Margaret via the real backend
+  // Wire up token getter for apiFetch
   useEffect(() => {
-    // Check if we already have a valid Margaret session
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    if (isSignedIn) {
+      setTokenGetter(getToken);
+    }
+  }, [isSignedIn, getToken]);
+
+  // Fetch health profile when Clerk session is active
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    const fetchProfile = async () => {
       try {
-        const parsed = JSON.parse(stored);
-        if (parsed?.email === DEMO_EMAIL && parsed?.id) {
-          // Verify the stored user still works by hitting the backend
-          fetch(`${BACKEND_URL}/api/profiles`, {
-            headers: { "x-user-id": parsed.id },
-          })
-            .then((res) => {
-              if (res.ok) {
-                return res.json().then((profile: UserProfile) => {
-                  setUser(profile);
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-                });
-              }
-              // Stored user is stale — fall through to fresh login
-              throw new Error("stale");
-            })
-            .catch(() => doLogin())
-            .finally(() => setLoading(false));
-          return;
-        }
-      } catch {
-        // ignore
-      }
-      // Stored user is not Margaret — clear and re-login
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    doLogin();
-
-    function doLogin() {
-      fetch(`${BACKEND_URL}/api/profiles/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: DEMO_EMAIL }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auto-login failed");
-          return res.json();
-        })
-        .then((profile: UserProfile) => {
+        const res = await apiFetch("/api/profiles");
+        if (res.ok) {
+          const profile: UserProfile = await res.json();
           setUser(profile);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
-  }, []);
+        } else {
+          // Profile will be lazy-created by backend on first authenticated request
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const login = async (email: string) => {
-    const res = await fetch(`${BACKEND_URL}/api/profiles/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Login failed");
-    }
-    const profile: UserProfile = await res.json();
-    setUser(profile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  };
+    fetchProfile();
+  }, [isSignedIn, isLoaded, clerkUser?.id]);
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
+    signOut();
   };
 
   const refreshProfile = async () => {
-    if (!user) return;
-    const res = await fetch(`${BACKEND_URL}/api/profiles`, {
-      headers: { "x-user-id": user.id },
-    });
-    if (res.ok) {
-      const profile: UserProfile = await res.json();
-      setUser(profile);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    if (!isSignedIn) return;
+    try {
+      const res = await apiFetch("/api/profiles");
+      if (res.ok) {
+        const profile: UserProfile = await res.json();
+        setUser(profile);
+      }
+    } catch (err) {
+      console.error("Failed to refresh profile:", err);
     }
   };
 
   return (
-    <UserContext.Provider
-      value={{ user, loading, login, logout, refreshProfile }}
-    >
+    <UserContext.Provider value={{ user, loading, logout, refreshProfile }}>
       {children}
     </UserContext.Provider>
   );

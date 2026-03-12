@@ -1,33 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useUser } from "@/lib/user-context";
+import { SignIn } from "@clerk/nextjs";
 import { Mic } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useUser();
-  const [email] = useState("margaret@tessera.health");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setError("");
-    setLoading(true);
-
-    try {
-      await login(email.trim());
-      router.push("/app");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="flex h-dvh flex-col items-center justify-center bg-[#fafafa] px-8">
       <div className="mb-8 flex flex-col items-center">
@@ -38,30 +14,16 @@ export default function LoginPage() {
         <p className="mt-1 text-[14px] text-zinc-400">Your AI health companion</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-[320px]">
-        <input
-          type="email"
-          value={email}
-          readOnly
-          className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-[15px] text-zinc-900 outline-none cursor-default"
-        />
-        {error && (
-          <p className="mt-2.5 rounded-xl bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600" style={{ animation: "fadeUp 0.2s ease" }}>
-            {error}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={loading || !email.trim()}
-          className="mt-3 w-full rounded-2xl bg-zinc-900 py-3.5 text-[15px] font-medium text-white transition-all hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-40"
-        >
-          {loading ? "Signing in..." : "Continue"}
-        </button>
-      </form>
-
-      <p className="mt-6 text-center text-[12px] text-zinc-300">
-        Demo account
-      </p>
+      <SignIn
+        routing="hash"
+        appearance={{
+          elements: {
+            rootBox: "w-full max-w-[380px]",
+            cardBox: "shadow-none border-0",
+            card: "shadow-none border-0 bg-transparent",
+          },
+        }}
+      />
     </div>
   );
 }
