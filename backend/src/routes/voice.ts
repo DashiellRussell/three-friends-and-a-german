@@ -310,8 +310,9 @@ function pollCallCompletion(callId: string, conversationId: string, userId: stri
 router.post("/webhook/call-complete", async (req: Request, res: Response) => {
   const { conversation_id, transcript, status, duration_seconds } = req.body;
 
-  if (!conversation_id) {
-    res.status(400).json({ error: "conversation_id is required" });
+  // TODO: Add HMAC signature verification when ElevenLabs provides webhook signing
+  if (!conversation_id || typeof conversation_id !== "string") {
+    res.status(400).json({ error: "conversation_id must be a valid string" });
     return;
   }
 
@@ -358,7 +359,7 @@ router.post("/webhook/call-complete", async (req: Request, res: Response) => {
 
 // POST /api/voice/backfill — sync ALL calls that need processing (admin/dev endpoint)
 // Handles: (1) incomplete calls needing ElevenLabs fetch, (2) completed calls with transcript but no parsed check-in
-router.post("/backfill", async (req: Request, res: Response) => {
+router.post("/backfill", requireAuth, async (req: Request, res: Response) => {
   try {
     const results = [];
 

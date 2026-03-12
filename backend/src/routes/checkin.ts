@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import {
   extractCheckinData,
   embedText,
@@ -13,6 +14,8 @@ import { chunkAndStoreCheckin } from "../services/chunking";
 import { searchAllByText } from "../services/crossReference";
 
 const router = Router();
+
+const checkinLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: "Too many check-ins, please try again later" } });
 
 // Shared conversational instructions appended to generated context for voice & chat sessions.
 // Designed to feel like a natural conversation — no explicit 1-10 rating requests.
@@ -244,7 +247,7 @@ interface CheckInBody {
   transcript: string;
 }
 
-router.post("/", async (req: Request<{}, {}, CheckInBody>, res: Response) => {
+router.post("/", checkinLimiter, async (req: Request<{}, {}, CheckInBody>, res: Response) => {
   const { transcript } = req.body;
   const user_id = req.userId!;
 

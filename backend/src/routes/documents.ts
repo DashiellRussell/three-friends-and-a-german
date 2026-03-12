@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { supabase } from "../services/supabase";
 import { requireAuth } from "../middleware/auth";
 import { summarizeDocument, embedText } from "../services/mistral";
@@ -9,7 +10,9 @@ const DOCUMENT_BUCKET = "uploads";
 const router = Router();
 router.use(requireAuth);
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: "Too many uploads, please try again later" } });
 
 // GET /api/documents — list user's documents
 router.get("/", async (req: Request, res: Response) => {
@@ -83,7 +86,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // POST /api/documents/upload — upload a medical document
-router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
+router.post("/upload", uploadLimiter, upload.single("file"), async (req: Request, res: Response) => {
   const userId = req.userId!;
   const { document_text, file_name, document_type } = req.body;
   const file = req.file;
