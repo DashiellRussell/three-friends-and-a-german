@@ -1,10 +1,10 @@
-# Database Schema Plan — Part 1: MVP (Caretaker Relationships)
+# Auth & User Relations — Part 1: MVP (Caretaker Relationships)
 
 ## Context
 
 Tessera currently has a single-user model — each person has a `profiles` record and can only see their own health data. This MVP adds **caretaker relationships** so family members and friends can monitor a loved one's health, with proper permissions and account claiming.
 
-This is Part 1 of a 2-part schema plan. Part 2 covers doctors, organizations, and partnerships (see `schema-plan-part2-future.md`).
+This is Part 1 of a 2-part auth & user relations plan. Part 2 covers doctors, organizations, and partnerships (see `auth-and-user-relations-part2-future.md`).
 
 ### What MVP Includes
 - Caretaker relationships (with levels, permissions, account claiming)

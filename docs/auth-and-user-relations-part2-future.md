@@ -1,8 +1,8 @@
-# Database Schema Plan — Part 2: Doctors, Organizations & Partnerships
+# Auth & User Relations — Part 2: Doctors, Organizations & Partnerships
 
 ## Context
 
-This is Part 2 of the database schema plan. Part 1 (`schema-plan-part1-mvp.md`) covers the MVP: caretaker relationships, invite codes, and audit log.
+This is Part 2 of the auth & user relations plan. Part 1 (`auth-and-user-relations-part1-mvp.md`) covers the MVP: caretaker relationships, invite codes, and audit log.
 
 Part 2 adds **doctors**, **care organizations** (old age homes), **doctor organizations** (hospitals/clinics), and **org-to-org partnerships**. These are fundamentally different account types from patients — they have no medical records of their own.
 
