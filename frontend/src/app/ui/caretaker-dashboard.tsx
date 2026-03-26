@@ -124,7 +124,7 @@ export function CaretakerDashboard({
   onNavigate,
 }: {
   seed: SeedData;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: "dashboard" | "dependents" | "invites" | "permissions") => void;
 }) {
   const [selectedDependent, setSelectedDependent] = useState<string | null>(null);
 
