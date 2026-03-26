@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/login(.*)",
   "/demo(.*)",
+  "/ui(.*)",
   "/api/waitlist(.*)",
 ]);
 
