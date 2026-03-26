@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { SeedData } from "./seed-data";
 
 function timeAgo(dateStr: string): string {
@@ -22,15 +22,23 @@ function timeUntil(dateStr: string): string {
   return `${Math.floor(hours / 24)}d left`;
 }
 
+function maskCode(code: string): string {
+  return code.slice(0, 2) + "****";
+}
+
 function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }) {
   const [email, setEmail] = useState("");
   const [level, setLevel] = useState<"primary" | "secondary">("secondary");
   const [generating, setGenerating] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(true);
+  const [hidden, setHidden] = useState(false);
 
   const handleGenerate = () => {
     setGenerating(true);
+    setHidden(false);
+    setRevealed(true);
     setTimeout(() => {
       const code = Array.from({ length: 6 }, () =>
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random() * 36))
@@ -38,6 +46,10 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
       setGeneratedCode(code);
       setGenerating(false);
       onGenerate(code);
+      // Auto-hide after 10 seconds
+      setTimeout(() => {
+        setRevealed(false);
+      }, 10000);
     }, 800);
   };
 
@@ -49,6 +61,10 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
     }
   };
 
+  const handleDone = () => {
+    setHidden(true);
+  };
+
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5" style={{ animation: "fadeUp 0.4s ease-out both" }}>
       <h3 className="text-[15px] font-semibold text-zinc-900">Generate Invite Code</h3>
@@ -56,7 +72,7 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
         Create a 6-character code to link a caretaker to your dependent
       </p>
 
-      {!generatedCode ? (
+      {(!generatedCode || hidden) ? (
         <div className="mt-4 space-y-3">
           <div>
             <label className="text-[12px] font-medium text-zinc-500">Restrict to email (optional)</label>
@@ -108,9 +124,27 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
               </>
             )}
           </button>
+
+          {/* Show last generated code masked */}
+          {hidden && generatedCode && (
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-zinc-50 px-4 py-2.5">
+              <span className="font-mono text-[14px] font-semibold tracking-wider text-zinc-400">{maskCode(generatedCode)}</span>
+              <span className="text-[11px] text-zinc-400">Code hidden</span>
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-5" style={{ animation: "fadeUp 0.3s ease-out both" }}>
+          {/* Countdown warning */}
+          {revealed && (
+            <div className="mb-3 flex items-center justify-center gap-1.5 text-[11px] text-amber-600">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              Code will auto-hide — copy it now
+            </div>
+          )}
+
           <div className="flex items-center justify-center gap-1.5 rounded-2xl bg-zinc-50 py-6">
             {generatedCode.split("").map((char, i) => (
               <div
@@ -118,10 +152,21 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
                 className="flex h-12 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-[20px] font-bold tracking-wider text-zinc-900 shadow-sm"
                 style={{ animation: `fadeUp 0.3s ease-out ${i * 60}ms both` }}
               >
-                {char}
+                {revealed ? char : "\u2022"}
               </div>
             ))}
           </div>
+
+          {!revealed && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setRevealed(true)}
+                className="text-[12px] font-medium text-zinc-500 hover:text-zinc-700"
+              >
+                Reveal code
+              </button>
+            </div>
+          )}
 
           <div className="mt-4 flex gap-2">
             <button
@@ -148,10 +193,10 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
               )}
             </button>
             <button
-              onClick={() => { setGeneratedCode(null); setEmail(""); }}
-              className="flex flex-1 items-center justify-center rounded-xl border border-zinc-200 py-2.5 text-[13px] font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+              onClick={handleDone}
+              className="flex flex-1 items-center justify-center rounded-xl bg-zinc-900 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-800"
             >
-              New Code
+              Done
             </button>
           </div>
 
@@ -165,7 +210,6 @@ function GenerateCodeCard({ onGenerate }: { onGenerate: (code: string) => void }
 }
 
 function RedeemCodeCard() {
-  const [code, setCode] = useState("");
   const [chars, setChars] = useState<string[]>(Array(6).fill(""));
   const [status, setStatus] = useState<"idle" | "checking" | "success" | "error">("idle");
 
@@ -176,31 +220,21 @@ function RedeemCodeCard() {
     newChars[index] = upper.charAt(0);
     setChars(newChars);
 
-    // Auto-focus next
     if (upper && index < 5) {
-      const next = document.getElementById(`code-${index + 1}`);
-      next?.focus();
-    }
-
-    if (newChars.every((c) => c)) {
-      setCode(newChars.join(""));
+      document.getElementById(`code-${index + 1}`)?.focus();
     }
   };
 
   const handleRedeem = () => {
     if (chars.filter((c) => c).length < 6) return;
     setStatus("checking");
-    setTimeout(() => {
-      setStatus("success");
-    }, 1200);
+    setTimeout(() => setStatus("success"), 1200);
   };
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5" style={{ animation: "fadeUp 0.4s ease-out 0.1s both" }}>
       <h3 className="text-[15px] font-semibold text-zinc-900">Redeem Invite Code</h3>
-      <p className="mt-1 text-[12px] text-zinc-400">
-        Enter a code shared by a patient or caretaker
-      </p>
+      <p className="mt-1 text-[12px] text-zinc-400">Enter a code shared by a patient or caretaker</p>
 
       <div className="mt-4 flex items-center justify-center gap-1.5">
         {chars.map((char, i) => (
@@ -245,10 +279,7 @@ function RedeemCodeCard() {
       </button>
 
       {status === "success" && (
-        <div
-          className="mt-3 rounded-xl bg-emerald-50 p-3 text-center text-[12px] text-emerald-700"
-          style={{ animation: "fadeUp 0.3s ease-out both" }}
-        >
+        <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-center text-[12px] text-emerald-700" style={{ animation: "fadeUp 0.3s ease-out both" }}>
           Successfully linked as a caretaker. You can now view their health data.
         </div>
       )}
@@ -257,6 +288,16 @@ function RedeemCodeCard() {
 }
 
 export function InviteFlow({ seed }: { seed: SeedData }) {
+  const [revealedCodes, setRevealedCodes] = useState<Set<string>>(new Set());
+
+  const toggleReveal = (id: string) => {
+    setRevealedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="px-5 pt-6 pb-8">
       <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900" style={{ animation: "fadeUp 0.3s ease-out both" }}>
@@ -270,7 +311,7 @@ export function InviteFlow({ seed }: { seed: SeedData }) {
         <GenerateCodeCard onGenerate={() => {}} />
         <RedeemCodeCard />
 
-        {/* Existing codes */}
+        {/* Existing codes — masked by default */}
         <div style={{ animation: "fadeUp 0.4s ease-out 0.2s both" }}>
           <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
             Your invite codes
@@ -279,6 +320,9 @@ export function InviteFlow({ seed }: { seed: SeedData }) {
             {seed.invites.map((inv, i) => {
               const isExpired = new Date(inv.expires_at) < new Date();
               const isUsed = inv.redeemed_at !== null;
+              const isRevealed = revealedCodes.has(inv.id);
+              const displayCode = isRevealed ? inv.code : maskCode(inv.code);
+
               return (
                 <div
                   key={inv.id}
@@ -294,17 +338,33 @@ export function InviteFlow({ seed }: { seed: SeedData }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[14px] font-semibold tracking-wider text-zinc-900">
-                        {inv.code}
+                        {displayCode}
                       </span>
+                      {/* Reveal/hide toggle */}
+                      <button
+                        onClick={() => toggleReveal(inv.id)}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                        title={isRevealed ? "Hide" : "Reveal"}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          {isRevealed ? (
+                            <>
+                              <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </>
+                          ) : (
+                            <>
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </>
+                          )}
+                        </svg>
+                      </button>
                       {isUsed && (
-                        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-                          Used
-                        </span>
+                        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Used</span>
                       )}
                       {isExpired && !isUsed && (
-                        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
-                          Expired
-                        </span>
+                        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">Expired</span>
                       )}
                     </div>
                     <div className="mt-0.5 text-[11px] text-zinc-400">

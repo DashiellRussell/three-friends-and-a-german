@@ -1,82 +1,120 @@
 "use client";
 
 import { useState } from "react";
-import { CaretakerDashboard } from "./caretaker-dashboard";
-import { InviteFlow } from "./invite-flow";
-import { PermissionsPanel } from "./permissions-panel";
-import { DependentView } from "./dependent-view";
+import { MockAppShell } from "./mock-app-shell";
+import { OnboardingPreview } from "./onboarding-preview";
 import { SEED } from "./seed-data";
+import type { SeedProfile } from "./seed-data";
 
-type Tab = "dashboard" | "dependents" | "invites" | "permissions";
+type Persona = "patient" | "caretaker" | "dependent";
+
+const PERSONAS: { id: Persona; label: string; desc: string; profile: SeedProfile }[] = [
+  { id: "patient", label: "Margaret", desc: "Patient (regular user)", profile: SEED.profiles[0] },
+  { id: "caretaker", label: "Sarah", desc: "Caretaker (manages others)", profile: SEED.profiles[1] },
+  { id: "dependent", label: "James", desc: "Dependent (being cared for)", profile: SEED.profiles[3] },
+];
 
 export default function UIPlayground() {
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [persona, setPersona] = useState<Persona>("patient");
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: "dashboard", label: "Overview", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" },
-    { id: "dependents", label: "Dependents", icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
-    { id: "invites", label: "Invites", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
-    { id: "permissions", label: "Permissions", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
-  ];
+  const currentPersona = PERSONAS.find((p) => p.id === persona)!;
+
+  if (showOnboarding) {
+    return <OnboardingPreview onBack={() => setShowOnboarding(false)} />;
+  }
 
   return (
     <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-[#fafafa] font-sans">
-      {/* Top bar */}
-      <div className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-zinc-100 bg-white/80 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-lg">
-        <div className="flex items-center gap-1.5">
-          <div className="flex h-5 w-5 items-center justify-center rounded bg-amber-100">
-            <span className="text-[10px]">UI</span>
+      {/* Floating persona switcher */}
+      <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-50">
+        <button
+          onClick={() => setPickerOpen(!pickerOpen)}
+          className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/90 px-3 py-1.5 shadow-sm backdrop-blur-md transition-all hover:bg-amber-100 active:scale-[0.97]"
+        >
+          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-200 text-[10px] font-bold text-amber-800">
+            {currentPersona.profile.display_name.charAt(0)}
           </div>
-          <span className="text-[11px] font-medium text-amber-600">Playground</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            </svg>
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-zinc-900">Tessera</span>
-        </div>
-        <div className="w-16" />
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {tab === "dashboard" && <CaretakerDashboard seed={SEED} onNavigate={setTab} />}
-        {tab === "dependents" && <DependentView seed={SEED} />}
-        {tab === "invites" && <InviteFlow seed={SEED} />}
-        {tab === "permissions" && <PermissionsPanel seed={SEED} />}
-      </div>
-
-      {/* Bottom tab bar */}
-      <div className="sticky bottom-0 z-30 flex shrink-0 items-center justify-around border-t border-zinc-100 bg-white/90 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            className={`flex flex-col items-center gap-1 px-3 py-1.5 transition-colors ${
-              tab === item.id ? "text-zinc-900" : "text-zinc-300"
-            }`}
+          <span className="text-[11px] font-semibold text-amber-800">
+            {currentPersona.label}
+          </span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#92400e"
+            strokeWidth="3"
+            strokeLinecap="round"
+            className={`transition-transform ${pickerOpen ? "rotate-180" : ""}`}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d={item.icon} />
-            </svg>
-            <span className={`text-[10px] ${tab === item.id ? "font-semibold" : "font-normal"}`}>
-              {item.label}
-            </span>
-          </button>
-        ))}
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* Dropdown */}
+        {pickerOpen && (
+          <div
+            className="absolute left-0 top-full mt-1.5 w-64 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
+            style={{ animation: "fadeUp 0.2s ease-out both" }}
+          >
+            <div className="px-3 pt-3 pb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+                View as
+              </span>
+            </div>
+            {PERSONAS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => { setPersona(p.id); setPickerOpen(false); }}
+                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-zinc-50 ${
+                  persona === p.id ? "bg-zinc-50" : ""
+                }`}
+              >
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold text-white ${
+                  persona === p.id ? "bg-zinc-900" : "bg-zinc-400"
+                }`}>
+                  {p.profile.display_name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium text-zinc-900">{p.profile.display_name}</div>
+                  <div className="text-[11px] text-zinc-400">{p.desc}</div>
+                </div>
+                {persona === p.id && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#18181b" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            ))}
+
+            <div className="border-t border-zinc-100 p-2">
+              <button
+                onClick={() => { setShowOnboarding(true); setPickerOpen(false); }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-violet-50"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[13px] font-medium text-violet-700">Onboarding Flow</div>
+                  <div className="text-[11px] text-violet-400">Preview the setup wizard</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Close picker on outside click */}
+      {pickerOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setPickerOpen(false)} />
+      )}
+
+      <MockAppShell seed={SEED} persona={persona} profile={currentPersona.profile} />
     </div>
   );
 }
