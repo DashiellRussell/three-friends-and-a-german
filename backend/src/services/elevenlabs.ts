@@ -43,17 +43,10 @@ export interface ConversationDetails {
 export async function getConversationDetails(
   conversationId: string,
 ): Promise<ConversationDetails> {
-  const res = await fetch(
+  const { data } = await axios.get<ConversationDetails>(
     `${BASE_URL}/v1/convai/conversations/${conversationId}`,
     { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
   );
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to get conversation details (${res.status}): ${errBody}`,
-    );
-  }
-  const data = (await res.json()) as ConversationDetails;
   // Log raw keys on first call so we can see what ElevenLabs actually returns
   console.log(`[elevenlabs] Conversation ${conversationId} keys:`, Object.keys(data));
   console.log(`[elevenlabs] Duration fields:`, {
@@ -68,18 +61,12 @@ export async function updateAgent(
   agentId: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  const res = await fetch(`${BASE_URL}/v1/convai/agents/${agentId}`, {
-    method: "PATCH",
+  await axios.patch(`${BASE_URL}/v1/convai/agents/${agentId}`, patch, {
     headers: {
       "xi-api-key": ELEVENLABS_API_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(patch),
   });
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    throw new Error(`Failed to update agent ${agentId} (${res.status}): ${errBody}`);
-  }
 }
 
 export async function initiateOutboundCall(
@@ -87,28 +74,21 @@ export async function initiateOutboundCall(
   dynamicVariables: Record<string, string>,
 ): Promise<{ conversationId: string; callSid: string }> {
   const formattedNumber = normalizePhoneNumber(toNumber);
-  const res = await fetch(`${BASE_URL}/v1/convai/twilio/outbound-call`, {
-    method: "POST",
+  const { data } = await axios.post<{
+    conversation_id: string;
+    callSid: string;
+  }>(`${BASE_URL}/v1/convai/twilio/outbound-call`, {
+    agent_id: process.env.ELEVENLABS_OUTBOUND_AGENT_ID || process.env.ELEVENLABS_AGENT_ID,
+    agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
+    to_number: formattedNumber,
+    conversation_initiation_client_data: {
+      dynamic_variables: dynamicVariables,
+    },
+  }, {
     headers: {
       "xi-api-key": ELEVENLABS_API_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      agent_id: process.env.ELEVENLABS_OUTBOUND_AGENT_ID || process.env.ELEVENLABS_AGENT_ID,
-      agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
-      to_number: formattedNumber,
-      conversation_initiation_client_data: {
-        dynamic_variables: dynamicVariables,
-      },
-    }),
   });
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    throw new Error(`Failed to initiate outbound call (${res.status}): ${errBody}`);
-  }
-  const data = (await res.json()) as {
-    conversation_id: string;
-    callSid: string;
-  };
   return { conversationId: data.conversation_id, callSid: data.callSid };
 }
