@@ -16,6 +16,8 @@ import dashboard from "./routes/dashboard";
 import medications from "./routes/medications";
 import trends from "./routes/trends";
 import waitlist from "./routes/waitlist";
+import relationships from "./routes/relationships";
+import invite from "./routes/invite";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +38,8 @@ app.use("/api/dashboard", dashboard);
 app.use("/api/medications", medications);
 app.use("/api/trends", trends);
 app.use("/api/waitlist", waitlist);
+app.use("/api/relationships", relationships);
+app.use("/api/invite", invite);
 
 // Health check
 app.get("/ping", (_req, res) => {

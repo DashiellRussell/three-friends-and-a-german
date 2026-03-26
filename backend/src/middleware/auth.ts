@@ -7,6 +7,8 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      targetUserId?: string;
+      actorType?: "self" | "caretaker";
     }
   }
 }
@@ -111,4 +113,45 @@ export async function requireAuth(
     res.status(500).json({ error: "Authentication error" });
     return;
   }
+}
+
+/**
+ * resolveTargetUser — reads `?for=<patient_id>` or `x-on-behalf-of` header.
+ * If present, checks the acting user's caretaker permissions.
+ * Sets req.targetUserId and req.actorType.
+ * Must be used AFTER requireAuth.
+ */
+export async function resolveTargetUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const targetId = (req.query.for as string) || (req.headers["x-on-behalf-of"] as string);
+
+  if (!targetId || targetId === req.userId) {
+    // Acting as self
+    req.targetUserId = req.userId;
+    req.actorType = "self";
+    return next();
+  }
+
+  // Check caretaker relationship
+  const { data: rel } = await supabase
+    .from("caretaker_relationships")
+    .select("permissions")
+    .eq("caretaker_id", req.userId!)
+    .eq("patient_id", targetId)
+    .eq("status", "active")
+    .single();
+
+  if (!rel) {
+    res.status(403).json({ error: "No active caretaker relationship with this patient" });
+    return;
+  }
+
+  req.targetUserId = targetId;
+  req.actorType = "caretaker";
+  // Store permissions on the request for route-level checks
+  (req as any).caretakerPermissions = rel.permissions;
+  return next();
 }
