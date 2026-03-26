@@ -68,7 +68,7 @@ router.get("/:code/info", async (req: Request, res: Response) => {
         display_name, email
       )
     `)
-    .eq("code", code.toUpperCase())
+    .eq("code", String(code).toUpperCase())
     .is("redeemed_at", null)
     .single();
 
@@ -120,7 +120,7 @@ router.post("/redeem", async (req: Request, res: Response) => {
   const { data: invite, error: inviteErr } = await supabase
     .from("invite_codes")
     .select("*")
-    .eq("code", code.toUpperCase())
+    .eq("code", String(code).toUpperCase())
     .single();
 
   if (inviteErr || !invite) {
