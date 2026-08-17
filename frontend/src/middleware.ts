@@ -1,37 +1,50 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/login(.*)",
-  "/demo(.*)",
-  "/api/waitlist(.*)",
-]);
+const PUBLIC_PATTERNS = [
+  /^\/$/,
+  /^\/login(.*)/,
+  /^\/demo(.*)/,
+  /^\/ui(.*)/,
+  /^\/api\/waitlist(.*)/,
+];
 
-const isAppRoute = createRouteMatcher([
-  "/app(.*)",
-  "/onboarding(.*)",
-]);
+function isPublic(pathname: string) {
+  return PUBLIC_PATTERNS.some((p) => p.test(pathname));
+}
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) return;
-
-  // All non-public routes require auth
-  const { userId } = await auth.protect({
-    unauthenticatedUrl: new URL("/login", req.url).toString(),
-  });
-
-  // App routes require closed_beta metadata — fetch from Clerk API
-  if (isAppRoute(req) && userId) {
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId);
-    const metadata = user.publicMetadata as Record<string, unknown>;
-    if (!metadata?.closed_beta) {
-      return NextResponse.redirect(new URL("/?access=waitlist", req.url));
-    }
+export default async function middleware(req: NextRequest) {
+  // If Clerk isn't configured, allow all requests through
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+    return NextResponse.next();
   }
-});
+
+  // Public routes — no auth needed
+  if (isPublic(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
+  // Dynamically import Clerk only when keys are present
+  const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
+  const { clerkClient } = await import("@clerk/nextjs/server");
+
+  const isAppRoute = createRouteMatcher(["/app(.*)", "/onboarding(.*)"]);
+
+  return clerkMiddleware(async (auth, request) => {
+    const { userId } = await auth.protect({
+      unauthenticatedUrl: new URL("/login", request.url).toString(),
+    });
+
+    if (isAppRoute(request) && userId) {
+      const client = await clerkClient();
+      const user = await client.users.getUser(userId);
+      const metadata = user.publicMetadata as Record<string, unknown>;
+      if (!metadata?.closed_beta) {
+        return NextResponse.redirect(new URL("/?access=waitlist", request.url));
+      }
+    }
+  })(req, {} as any);
+}
 
 export const config = {
   matcher: [
